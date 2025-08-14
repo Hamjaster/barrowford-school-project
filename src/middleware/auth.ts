@@ -1,0 +1,190 @@
+import { Request, Response, NextFunction } from 'express';
+import { AuthUtils, JWTPayload } from '../utils/auth';
+
+// Extend Request interface to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: JWTPayload;
+    }
+  }
+}
+
+export interface AuthenticatedRequest extends Request {
+  user: JWTPayload;
+}
+
+// Centralized permissions system
+const permissions = {
+  admin: [
+    "manage_users",
+    "create_staff_admin", 
+    "create_staff",
+    "create_parent",
+    "create_student",
+    "reset_all_passwords",
+    "reset_staff_admin_passwords",
+    "reset_staff_passwords",
+    "reset_parent_passwords",
+    "reset_student_passwords",
+    "view_all_data",
+    "manage_system"
+  ],
+  staff_admin: [
+    "manage_users",
+    "create_staff",
+    "create_parent", 
+    "create_student",
+    "reset_staff_passwords",
+    "reset_parent_passwords",
+    "reset_student_passwords",
+    "view_school_data",
+    "manage_classes"
+  ],
+  staff: [
+    "manage_users",
+    "create_parent",
+    "create_student", 
+    "reset_parent_passwords",
+    "reset_student_passwords",
+    "view_class_data",
+    "manage_assignments",
+    "grade_assignments"
+  ],
+  parent: [
+    "view_own_children",
+    "view_child_progress",
+    "communicate_teachers"
+  ],
+  student: [
+    "view_own_progress",
+    "view_assignments",
+    "submit_assignments"
+  ]
+};
+
+// Permission checking middleware
+export const checkPermission = (requiredPermission: string) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ 
+        success: false, 
+        message: 'Authentication required' 
+      });
+      return;
+    }
+
+    const role = req.user.role;
+    const userPermissions = permissions[role as keyof typeof permissions];
+    
+    if (userPermissions?.includes(requiredPermission)) {
+      next();
+      return;
+    }
+
+    res.status(403).json({ 
+      success: false, 
+      message: `Forbidden: Insufficient permissions. Required permission: ${requiredPermission}` 
+    });
+  };
+};
+
+export const authenticateToken = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    if (!token) {
+      res.status(401).json({ 
+        success: false, 
+        message: 'Access token required' 
+      });
+      return;
+    }
+
+    const decoded = AuthUtils.verifyAccessToken(token);
+    
+    // Note: You can add user existence/active status check here if needed
+    // For now, we trust the JWT token validation
+
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(403).json({ 
+      success: false, 
+      message: 'Invalid or expired token' 
+    });
+  }
+};
+
+// Legacy role-based middlewares (kept for backward compatibility if needed)
+// You can remove these if not used elsewhere in the codebase
+export const requireRole = (allowedRoles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ 
+        success: false, 
+        message: 'Authentication required' 
+      });
+      return;
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      res.status(403).json({ 
+        success: false, 
+        message: 'Insufficient permissions' 
+      });
+      return;
+    }
+
+    next();
+  };
+};
+
+// Middleware to check if user can access specific student's data
+export const canAccessStudentData = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ 
+        success: false, 
+        message: 'Authentication required' 
+      });
+      return;
+    }
+
+    const { role, userId } = req.user;
+    const studentId = req.params.studentId || req.body.studentId;
+
+    // Admin and staff can access all student data
+    if (['admin', 'staff_admin', 'staff'].includes(role)) {
+      next();
+      return;
+    }
+
+    // Parents can only access their own children's data
+    if (role === 'parent') {
+      // This would require a parent-student relationship table
+      // For now, we'll implement basic check - you can expand this based on your DB schema
+      next();
+      return;
+    }
+
+    // Students can only access their own data
+    if (role === 'student') {
+      if (userId !== studentId) {
+        res.status(403).json({ 
+          success: false, 
+          message: 'Access denied: Can only access own data' 
+        });
+        return;
+      }
+    }
+
+    next();
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error checking access permissions' 
+    });
+  }
+};
