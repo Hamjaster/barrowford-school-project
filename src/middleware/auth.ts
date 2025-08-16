@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthUtils, JWTPayload } from '../utils/auth';
+import { AuthUtils, JWTPayload } from '../utils/auth.js';
 
 // Extend Request interface to include user
 declare global {

@@ -3,11 +3,11 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import { config } from './config';
-import { errorHandler, notFound } from './middleware/errorHandler';
+import { config } from './config/index.js';
+import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 // Import routes
-import authRoutes from './routes/auth';
+import authRoutes from './routes/auth.js';
 
 
 const app = express();

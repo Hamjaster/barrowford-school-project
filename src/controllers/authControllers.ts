@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import { supabase } from '../db/supabase';
-import { AuthUtils } from '../utils/auth';
-import { AuthenticatedRequest } from '../middleware/auth';
+import { supabase } from '../db/supabase.js';
+import { AuthUtils } from '../utils/auth.js';
+import { AuthenticatedRequest } from '../middleware/auth.js';
 import { createClient } from '@supabase/supabase-js';
 
 // Helper function to validate role-specific user creation

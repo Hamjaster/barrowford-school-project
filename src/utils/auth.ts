@@ -1,7 +1,7 @@
 import jwt, { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import { config } from '../config';
+import { config } from '../config/index.js';
 
 export interface JWTPayload {
   userId: string;

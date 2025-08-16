@@ -1,18 +1,18 @@
 import { Router, Request, Response } from 'express';
 // import { db } from '../db';
-import { AuthUtils } from '../utils/auth';
-import { EmailService } from '../utils/email';
+import { AuthUtils } from '../utils/auth.js';
+import { EmailService } from '../utils/email.js';
 import { 
   validate, 
   loginSchema, 
   passwordResetRequestSchema, 
   passwordResetSchema,
   changePasswordSchema 
-} from '../middleware/validation';
-import { asyncHandler, AppError } from '../middleware/errorHandler';
-import { authenticateToken, checkPermission } from '../middleware/auth';
-import { config } from '../config';
-import { register, login, createUser, forgotPassword, resetPassword, manualPasswordReset } from '../controllers/authControllers';
+} from '../middleware/validation.js';
+import { asyncHandler, AppError } from '../middleware/errorHandler.js';
+import { authenticateToken, checkPermission } from '../middleware/auth.js';
+import { config } from '../config/index.js';
+import { register, login, createUser, forgotPassword, resetPassword, manualPasswordReset } from '../controllers/authControllers.js';
 
 const router = Router();
 const emailService = new EmailService();
