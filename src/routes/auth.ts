@@ -26,13 +26,11 @@ router.post('/create-user', authenticateToken, checkPermission('manage_users'), 
 
 // Password reset routes
 router.post('/forgot-password', forgotPassword); // Public - anyone can request reset
-router.post('/reset-password', resetPassword); // Public - reset with token
+// This would be handled by the client side
+// router.post('/reset-password-token', resetPassword); // Public - reset with token
 
-// Manual password reset routes (role-based)
-router.post('/reset-staff-password', authenticateToken, checkPermission('reset_staff_passwords'), manualPasswordReset as any);
-router.post('/reset-parent-password', authenticateToken, checkPermission('reset_parent_passwords'), manualPasswordReset as any);
-router.post('/reset-student-password', authenticateToken, checkPermission('reset_student_passwords'), manualPasswordReset as any);
-router.post('/reset-all-passwords', authenticateToken, checkPermission('reset_all_passwords'), manualPasswordReset as any);
+// Manual password reset route (unified) - higher user resets lower user's password by email
+router.post('/reset-password', authenticateToken, manualPasswordReset as any);
 
 // Refresh token endpoint
 // router.post('/refresh-token', asyncHandler(async (req, res) => {

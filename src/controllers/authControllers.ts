@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { supabase } from '../db/supabase';
 import { AuthUtils } from '../utils/auth';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { createClient } from '@supabase/supabase-js';
 
 // Helper function to validate role-specific user creation
 const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
@@ -302,7 +303,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-// FORGOT PASSWORD - Request password reset link
+// FORGOT PASSWORD - Request password reset link using Supabase Auth
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -314,22 +315,22 @@ export const forgotPassword = async (req: Request, res: Response) => {
       });
     }
 
-    // Check if user exists and get their role
+    // Check if user exists in our app_user table and get their role
     const { data: userData, error: userError } = await supabase
       .from('app_user')
       .select('role, first_name, last_name')
       .eq('email', email)
       .single();
 
+    // If user doesn't exist in our system, don't reveal this information
     if (userError || !userData) {
-      // Don't reveal if user exists or not (security best practice)
       return res.json({ 
         success: true,
         message: 'If an account with this email exists, a password reset link has been sent.' 
       });
     }
 
-    // Students cannot reset passwords via email
+    // Students cannot reset passwords via email (they need admin/staff to reset)
     if (userData.role === 'student') {
       return res.json({ 
         success: true,
@@ -337,40 +338,22 @@ export const forgotPassword = async (req: Request, res: Response) => {
       });
     }
 
-    // Generate password reset token
-    const resetToken = AuthUtils.generatePasswordResetToken();
-    const resetExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    // Use Supabase's built-in password reset functionality
+    const { data, error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`
+    });
+    console.log(data,'after sending supabase EMAIL')
 
-    // Store reset token in app_user table
-    const { error: updateError } = await supabase
-      .from('app_user')
-      .update({
-        password_reset_token: resetToken,
-        password_reset_expires: resetExpires.toISOString()
-      })
-      .eq('email', email);
-
-    if (updateError) {
-      console.error('Error storing reset token:', updateError);
+    if (resetError) {
+      console.error('Error sending password reset email:', resetError);
+      // Don't reveal specific error details to prevent email enumeration
       return res.json({ 
         success: true,
         message: 'If an account with this email exists, a password reset link has been sent.' 
       });
     }
 
-    // Send password reset email
-    try {
-      const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
-      
-      // For now, log the reset link (you can integrate with your email service)
-      console.log('Password reset link for', email, ':', resetLink);
-      
-      // TODO: Integrate with your email service to send the actual email
-      // await emailService.sendPasswordResetEmail(email, resetLink, userData.first_name);
-      
-    } catch (emailError) {
-      console.error('Error sending password reset email:', emailError);
-    }
+    console.log('Password reset email sent for:', email);
 
     res.json({ 
       success: true,
@@ -386,87 +369,100 @@ export const forgotPassword = async (req: Request, res: Response) => {
   }
 };
 
-// RESET PASSWORD - Confirm password reset with token
+// RESET PASSWORD - Update password using Supabase Auth (called from frontend after email link click)
+// This endpoint is used by the frontend when user clicks reset link and wants to set new password
 export const resetPassword = async (req: Request, res: Response) => {
   try {
-    const { token, newPassword } = req.body;
+    const { accessToken, refreshToken, newPassword } = req.body;
 
-    if (!token || !newPassword) {
+    if (!accessToken || !newPassword) {
       return res.status(400).json({ 
         success: false,
-        error: 'Token and new password are required' 
+        error: 'Access token and new password are required' 
       });
     }
 
-    // Validate password strength
-    const passwordValidation = AuthUtils.validatePassword(newPassword);
-    if (!passwordValidation.isValid) {
+    // Create a Supabase client and set the session from the tokens
+    const userSupabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!
+    );
+
+    // Set the session using the tokens from the password reset URL
+    const { data: sessionData, error: sessionError } = await userSupabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken
+    });
+
+    console.log('Session set result:', sessionData, sessionError);
+
+    if (sessionError || !sessionData.session) {
+      console.error('Error setting session:', sessionError);
       return res.status(400).json({ 
         success: false,
-        error: `Password validation failed: ${passwordValidation.errors.join(', ')}` 
+        error: 'Invalid or expired reset tokens' 
       });
     }
 
-    // Find user with valid reset token
-    const { data: userData, error: userError } = await supabase
+    const { user } = sessionData;
+    console.log('User from session:', user);
+
+    if (!user) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Invalid session' 
+      });
+    }
+
+    // Check if user exists in our app_user table and get their role
+    const { data: userData, error: appUserError } = await supabase
       .from('app_user')
-      .select('id, email, role, password_reset_expires, auth_user_id')
-      .eq('password_reset_token', token)
+      .select('role, email')
+      .eq('auth_user_id', user.id)
       .single();
 
-    if (userError || !userData) {
-      return res.status(400).json({ 
+    if (appUserError || !userData) {
+      return res.status(404).json({ 
         success: false,
-        error: 'Invalid or expired reset token' 
-      });
-    }
-
-    // Check if token has expired
-    if (userData.password_reset_expires && new Date(userData.password_reset_expires) < new Date()) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Reset token has expired' 
+        error: 'User not found in system' 
       });
     }
 
     // Students cannot reset passwords via email
     if (userData.role === 'student') {
-      return res.status(400).json({ 
+      return res.status(403).json({ 
         success: false,
         error: 'Students cannot reset passwords via email' 
       });
     }
 
-    // Update password in Supabase Auth
-    const { error: authError } = await supabase.auth.admin.updateUserById(
-      userData.auth_user_id, // Use auth_user_id from app_user table
-      { password: newPassword }
-    );
-
-    if (authError) {
-      console.error('Error updating password in auth:', authError);
+    console.log("CREATED CLIENT !", userSupabase)
+    console.log('GOT SESSION !')
+    // Update the password using the authenticated session
+    const { error: updateError } = await userSupabase.auth.updateUser({
+      password: newPassword
+    });
+    console.log('UPDATED PASSWORD !')
+    
+    if (updateError) {
+      console.error('Error updating password:', updateError);
       return res.status(400).json({ 
         success: false,
-        error: 'Failed to update password' 
+        error: updateError.message || 'Failed to update password' 
       });
     }
 
-    // Update password in app_user table
-    const { error: updateError } = await supabase
+    // Update password in app_user table as well for consistency
+    const { error: appUserUpdateError } = await supabase
       .from('app_user')
       .update({
-        password: await AuthUtils.hashPassword(newPassword),
-        password_reset_token: null,
-        password_reset_expires: null
+        password: await AuthUtils.hashPassword(newPassword)
       })
-      .eq('id', userData.id);
+      .eq('auth_user_id', user.id);
 
-    if (updateError) {
-      console.error('Error updating password in app_user:', updateError);
-      return res.status(400).json({ 
-        success: false,
-        error: 'Failed to update password' 
-      });
+    if (appUserUpdateError) {
+      console.error('Error updating password in app_user:', appUserUpdateError);
+      // Don't fail the request if this fails, as the auth password was updated successfully
     }
 
     res.json({ 
@@ -483,33 +479,33 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
-// MANUAL PASSWORD RESET - Higher user resets lower user's password
+// MANUAL PASSWORD RESET - Higher user resets lower user's password by email
 export const manualPasswordReset = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { targetUserId, newPassword } = req.body;
+    const { email, newPassword } = req.body;
     const creatorRole = req.user.role;
 
-    if (!targetUserId || !newPassword) {
+    if (!email || !newPassword) {
       return res.status(400).json({ 
         success: false,
-        error: 'Target user ID and new password are required' 
+        error: 'Email and new password are required' 
       });
     }
 
-    // Validate password strength
-    const passwordValidation = AuthUtils.validatePassword(newPassword);
-    if (!passwordValidation.isValid) {
-      return res.status(400).json({ 
-        success: false,
-        error: `Password validation failed: ${passwordValidation.errors.join(', ')}` 
-      });
-    }
+    // Validate password strength <-- REMOVE THIS
+    // const passwordValidation = AuthUtils.validatePassword(newPassword);
+    // if (!passwordValidation.isValid) {
+    //   return res.status(400).json({ 
+    //     success: false,
+    //     error: `Password validation failed: ${passwordValidation.errors.join(', ')}` 
+    //   });
+    // }
 
-    // Get target user details
+    // Get target user details by email
     const { data: targetUser, error: targetError } = await supabase
       .from('app_user')
       .select('id, role, email, auth_user_id')
-      .eq('id', targetUserId)
+      .eq('email', email)
       .single();
 
     if (targetError || !targetUser) {
@@ -527,12 +523,12 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
         error: canResetPassword.message 
       });
     }
-
-    // Update password in Supabase Auth
+console.log('updating password in auth')    // Update password in Supabase Auth
     const { error: authError } = await supabase.auth.admin.updateUserById(
       targetUser.auth_user_id,
       { password: newPassword }
     );
+    
 
     if (authError) {
       console.error('Error updating password in auth:', authError);
@@ -550,7 +546,7 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
         password_reset_token: null,
         password_reset_expires: null
       })
-      .eq('id', targetUserId);
+      .eq('id', targetUser.id);
 
     if (updateError) {
       console.error('Error updating password in app_user:', updateError);
