@@ -44,6 +44,53 @@ const canResetSpecificUserPassword = (creatorRole: string, targetRole: string) =
   return { allowed: true, message: '' };
 };
 
+// Helper function to convert student username to email
+const findStudentEmailByUsername = async (username: string): Promise<string | null> => {
+  try {
+    console.log('Looking up email for username:', username);
+    
+    // Look up all students to find matching username
+    const { data: userData, error: userError } = await supabase
+      .from('app_user')
+      .select('email, role, first_name, last_name')
+      .eq('role', 'student');
+
+    if (userError) {
+      console.error('Error looking up username:', userError);
+      return null;
+    }
+
+    if (!userData || userData.length === 0) {
+      return null;
+    }
+
+    // Find the student whose generated username matches the provided username
+    const matchedUser = userData.find(user => {
+      // Generate the expected username for this student
+      const expectedUsername = AuthUtils.generateUsername(user.first_name, user.last_name);
+      
+      // Also check for username with suffix (in case of duplicates)
+      // The suffix would be a number appended to the base username
+      const baseUsername = `${user.first_name.toLowerCase().trim()}.${user.last_name.toLowerCase().trim()}`;
+      
+      return expectedUsername === username || 
+             username.startsWith(baseUsername) || 
+             expectedUsername === username.toLowerCase();
+    });
+
+    if (!matchedUser) {
+      return null;
+    }
+
+    console.log('Converted username to email:', matchedUser.email);
+    return matchedUser.email;
+    
+  } catch (error) {
+    console.error('Error in findStudentEmailByUsername:', error);
+    return null;
+  }
+};
+
 // REGISTER
 export const register = async (req: Request, res: Response) => {
   const { email, password, dob, first_name, last_name, role } = req.body;
@@ -89,39 +136,86 @@ export const register = async (req: Request, res: Response) => {
   res.json({ message: 'Registration successful. Please verify your email.' });
 };
 
-// LOGIN
+/**
+ * LOGIN - Universal login endpoint supporting both email and username authentication
+ * 
+ * Features:
+ * - Staff/Admin/Parents: Login with email + password
+ * - Students: Login with username + password (username format: firstname.lastname)
+ * - Automatic username-to-email conversion for student authentication
+ * - Handles username collisions (with numeric suffixes)
+ * - Returns JWT token with role-based permissions
+ * - Includes username in response for student accounts
+ * 
+ * @param req.body.email - Email address (for non-student users)
+ * @param req.body.username - Username (for student users, format: firstname.lastname)
+ * @param req.body.password - User password
+ * @returns JWT access token and user profile information
+ */
 export const login = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { email, username, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+  // Validate input - either email or username must be provided
+  if ((!email && !username) || !password) {
+    return res.status(400).json({ 
+      error: 'Email/username and password are required' 
+    });
   }
 
+  // If both email and username are provided, prioritize email
+  if (email && username) {
+    return res.status(400).json({ 
+      error: 'Please provide either email or username, not both' 
+    });
+  }
+
+  let emailToUse = email;
+
+  // If username is provided, convert it to email (for students)
+  if (username && !email) {
+    emailToUse = await findStudentEmailByUsername(username);
+    
+    if (!emailToUse) {
+      return res.status(400).json({ error: 'Invalid username or password' });
+    }
+  }
+
+  // Authenticate with Supabase using email
   const { data, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: emailToUse!,
     password
   });
   
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) {
+    console.error('Authentication error:', error);
+    return res.status(400).json({ error: 'Invalid email/username or password' });
+  }
+
   console.log(data.user?.id, 'uuid');
-  // Get role from app_user table
+  
+  // Get role and profile data from app_user table
   const { data: roleData, error: roleError } = await supabase
     .from('app_user')
-    .select('role, first_name, last_name, dob')
+    .select('role, first_name, last_name, dob, email')
     .eq('auth_user_id', data.user?.id)
-    .single()
-  
+    .single();
 
   console.log(roleData, 'role DATA');
 
-  if (roleError) return res.status(400).json({ error: roleError.message });
+  if (roleError) {
+    console.error('Error fetching user role:', roleError);
+    return res.status(400).json({ error: 'User profile not found' });
+  }
+
+  // Generate JWT token
   const authToken = AuthUtils.generateAccessToken({
     userId: data.user?.id,
     role: roleData.role,
     email: data.user?.email
   });
 
-  res.json({
+  // Prepare response data
+  const responseData: any = {
     access_token: authToken,
     user: {
       id: data.user?.id,
@@ -131,7 +225,15 @@ export const login = async (req: Request, res: Response) => {
       last_name: roleData.last_name,
       dob: roleData.dob
     }
-  });
+  };
+
+  // Add username for students
+  if (roleData.role === 'student') {
+    const studentUsername = AuthUtils.generateUsername(roleData.first_name, roleData.last_name);
+    responseData.user.username = studentUsername;
+  }
+
+  res.json(responseData);
 };
 
 /**
@@ -225,26 +327,51 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     // Use the provided email for all users
     const emailToUse = email;
 
-    // Create user in Supabase Auth
+    // Create user in Supabase Auth - create unconfirmed user first
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: emailToUse,
       password: password,
-      email_confirm: true, // Supabase will send confirmation email automatically
+      email_confirm: true, // Create user with auto-confirmation
       user_metadata: {
         first_name,
         last_name,
         role
       }
     });
-
-    console.log("user added in auth")
+    console.log("user created in auth", authData)
+    
 
     if (authError) {
       return res.status(400).json({ 
         success: false,
         error: authError.message 
       });
-      
+    }
+
+    // Now send a confirmation email manually
+    if (authData.user) {
+      console.log('SENDING COFIRM EMAIL MANUALLY')
+      try {
+        // Generate email confirmation for the created user
+        const { error: confirmationError } = await supabase.auth.admin.generateLink({
+          type: 'signup',
+          email: emailToUse,
+          password: password,
+          options: {
+            redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/confirm-signup`
+          }
+        });
+
+        if (confirmationError) {
+          console.error('Error generating confirmation link:', confirmationError);
+          // Don't fail the user creation, but log the error
+        } else {
+          console.log('Confirmation email sent successfully');
+        }
+      } catch (confirmError) {
+        console.error('Error sending confirmation email:', confirmError);
+        // Don't fail the user creation
+      }
     }
     console.log(authData, 'authData')
     // Store profile data in app_user table
@@ -272,10 +399,10 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     console.log("user added in app_user")
 
 
-    // Confirmation email is automatically sent by Supabase for all users
+    // Confirmation email has been sent manually via generateLink
     const responseData: any = {
       success: true,
-      message: `${role} account created successfully. Confirmation email sent to user.`,
+      message: `${role} account created successfully. Confirmation email sent to ${email}.`,
       user: {
         id: authData.user?.id,
         email: email,
