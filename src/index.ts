@@ -54,11 +54,9 @@ app.get('/', (req, res) => {
     success: true,
     message: 'Welcome to School Portal API',
     version: '1.0.0',
-    documentation: '/api/docs', // Future endpoint for API documentation
+    
     endpoints: {
       auth: '/api/auth',
-      users: '/api/users',
-      academic: '/api/academic',
     },
   });
 });
