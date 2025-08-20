@@ -26,8 +26,6 @@ router.post('/create-user', authenticateToken, checkPermission('manage_users'), 
 
 // Password reset routes
 router.post('/forgot-password', forgotPassword); // Public - anyone can request reset
-// This would be handled by the client side
-// router.post('/reset-password-token', resetPassword); // Public - reset with token
 
 // Manual password reset route (unified) - higher user resets lower user's password by email
 router.post('/reset-password', authenticateToken, manualPasswordReset as any);
