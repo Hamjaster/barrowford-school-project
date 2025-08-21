@@ -18,36 +18,27 @@ export interface AuthenticatedRequest extends Request {
 const permissions = {
   admin: [
     "manage_users",
-    "create_staff_admin", 
     "create_staff",
     "create_parent",
     "create_student",
     "reset_all_passwords",
-    "reset_staff_admin_passwords",
     "reset_staff_passwords",
     "reset_parent_passwords",
     "reset_student_passwords",
     "view_all_data",
     "manage_system"
   ],
-  staff_admin: [
+  staff: [
     "manage_users",
     "create_staff",
-    "create_parent", 
-    "create_student",
+    "create_parent",
+    "create_student", 
     "reset_staff_passwords",
     "reset_parent_passwords",
     "reset_student_passwords",
     "view_school_data",
-    "manage_classes"
-  ],
-  staff: [
-    "manage_users",
-    "create_parent",
-    "create_student", 
-    "reset_parent_passwords",
-    "reset_student_passwords",
     "view_class_data",
+    "manage_classes",
     "manage_assignments",
     "grade_assignments"
   ],

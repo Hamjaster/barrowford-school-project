@@ -4,7 +4,7 @@ A comprehensive backend system for a UK primary school portal built with Node.js
 
 ## Features
 
-- **Multi-role Authentication System**: Admin, Staff Admin, Staff, Parent, and Child roles
+- **Multi-role Authentication System**: Admin, Staff/Teacher, Parent, and Student roles
 - **JWT-based Authentication**: Secure token-based authentication with refresh tokens
 - **Role-based Access Control**: Granular permissions based on user roles
 - **Password Management**: Secure password hashing, reset functionality, and validation
@@ -140,18 +140,18 @@ The server will start on `http://localhost:3000`
 | POST   | `/api/academic/years`                             | Create academic year           | Staff Admin+ |
 | GET    | `/api/academic/years`                             | List all years                 | Staff+       |
 | GET    | `/api/academic/years/:yearId`                     | Get specific year              | Staff+       |
-| PUT    | `/api/academic/years/:yearId`                     | Update year                    | Staff Admin+ |
-| PATCH  | `/api/academic/years/:yearId/activate`            | Activate year                  | Staff Admin+ |
-| PATCH  | `/api/academic/years/:yearId/deactivate`          | Deactivate year                | Staff Admin+ |
-| POST   | `/api/academic/subjects`                          | Create subject                 | Staff Admin+ |
+| PUT    | `/api/academic/years/:yearId`                     | Update year                    | Staff+       |
+| PATCH  | `/api/academic/years/:yearId/activate`            | Activate year                  | Staff+       |
+| PATCH  | `/api/academic/years/:yearId/deactivate`          | Deactivate year                | Staff+       |
+| POST   | `/api/academic/subjects`                          | Create subject                 | Staff+       |
 | GET    | `/api/academic/subjects`                          | List all subjects              | Staff+       |
 | GET    | `/api/academic/subjects/:subjectId`               | Get specific subject           | Staff+       |
-| PUT    | `/api/academic/subjects/:subjectId`               | Update subject                 | Staff Admin+ |
-| POST   | `/api/academic/assignments`                       | Assign staff to years/subjects | Staff Admin+ |
+| PUT    | `/api/academic/subjects/:subjectId`               | Update subject                 | Staff+       |
+| POST   | `/api/academic/assignments`                       | Assign staff to years/subjects | Staff+       |
 | GET    | `/api/academic/assignments`                       | List all assignments           | Staff+       |
 | GET    | `/api/academic/assignments/staff/:staffId`        | Get staff assignments          | Staff+       |
-| DELETE | `/api/academic/assignments/year/:assignmentId`    | Remove year assignment         | Staff Admin+ |
-| DELETE | `/api/academic/assignments/subject/:assignmentId` | Remove subject assignment      | Staff Admin+ |
+| DELETE | `/api/academic/assignments/year/:assignmentId`    | Remove year assignment         | Staff+       |
+| DELETE | `/api/academic/assignments/subject/:assignmentId` | Remove subject assignment      | Staff+       |
 
 ## User Roles and Permissions
 

@@ -52,7 +52,7 @@ export const createStaffSchema = Joi.object({
   email: Joi.string().email().required(),
   firstName: Joi.string().min(2).max(100).required(),
   lastName: Joi.string().min(2).max(100).required(),
-  role: Joi.string().valid('staff_admin', 'staff').required(),
+  role: Joi.string().valid('staff').required(),
   phoneNumber: Joi.string().pattern(/^[\+]?[0-9\s\-\(\)]{10,15}$/).optional(),
   address: Joi.string().max(500).optional(),
   dateOfBirth: Joi.date().iso().optional(),

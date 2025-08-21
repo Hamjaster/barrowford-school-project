@@ -7,9 +7,8 @@ import { createClient } from '@supabase/supabase-js';
 // Helper function to validate role-specific user creation
 const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
   const roleHierarchy = {
-    admin: ['staff_admin', 'staff', 'parent', 'student'],
-    staff_admin: ['staff', 'parent', 'student'],
-    staff: ['parent', 'student']
+    admin: ['staff', 'parent', 'student'],
+    staff: ['staff', 'parent', 'student']
   };
 
   const allowedRoles = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
@@ -27,9 +26,8 @@ const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
 // Helper function to validate password reset permissions
 const canResetSpecificUserPassword = (creatorRole: string, targetRole: string) => {
   const resetPermissions = {
-    admin: ['staff_admin', 'staff', 'parent', 'student'],
-    staff_admin: ['staff', 'parent', 'student'],
-    staff: ['parent', 'student']
+    admin: ['staff', 'parent', 'student'],
+    staff: ['staff', 'parent', 'student']
   };
 
   const allowedRoles = resetPermissions[creatorRole as keyof typeof resetPermissions];
