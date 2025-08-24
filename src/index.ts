@@ -8,6 +8,7 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
+import userRoutes from './routes/user.js';
 
 
 const app = express();
@@ -47,6 +48,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -75,22 +77,7 @@ const startServer = async () => {
       console.log(`🚀 Server running on http://localhost:${config.port}`);
       console.log(`📝 Environment: ${config.nodeEnv}`);
       console.log(`🔗 API Base URL: http://localhost:${config.port}/api`);
-      console.log('\n📚 Available endpoints:');
-      console.log('  • POST /api/auth/login');
-      console.log('  • POST /api/auth/forgot-password');
-      console.log('  • POST /api/auth/reset-password');
-      console.log('  • POST /api/auth/change-password');
-      console.log('  • GET  /api/auth/me');
-      console.log('  • POST /api/users/staff');
-      console.log('  • POST /api/users/parents');
-      console.log('  • POST /api/users/children');
-      console.log('  • GET  /api/users/staff');
-      console.log('  • GET  /api/users/parents');
-      console.log('  • GET  /api/users/children');
-      console.log('  • POST /api/academic/years');
-      console.log('  • POST /api/academic/subjects');
-      console.log('  • POST /api/academic/assignments');
-      console.log('\n💡 Use /health for health check');
+   
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

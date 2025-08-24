@@ -2,11 +2,12 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { config } from '../config/index.js';
+import { UserRole } from '../types.js';
 
 export interface JWTPayload {
   userId: string;
   email?: string | undefined;
-  role: 'admin' | 'staff_admin' | 'staff' | 'parent' | 'student';
+  role: UserRole;
   // iat?: number; // Uncomment this when adding expiry to tokens
   // exp?: number;
 }
