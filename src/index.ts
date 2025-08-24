@@ -21,7 +21,7 @@ const allowedOrigins = [
   config.frontendUrl,
   'http://localhost:3000',
   'http://localhost:5173',
-  // TODO: fix this later
+  // TODO: fix this laterr
   'https://nybble-bradford-school-frontend.vercel.app'
 ];
 
