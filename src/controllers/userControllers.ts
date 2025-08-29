@@ -16,8 +16,8 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
         sortOrder = 'desc' 
       } = req.query;
   
-      // Only admin and staff can view all users
-      if (!['admin', 'staff'].includes(creatorRole)) {
+      // Only admin, staff_admin and staff can view all users
+      if (!['admin', 'staff_admin', 'staff'].includes(creatorRole)) {
         return res.status(403).json({ 
           success: false,
           error: 'Insufficient permissions to view users' 
@@ -27,8 +27,9 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
       // Define role hierarchy - higher roles cannot be seen by lower roles
       // Note: Users will also be filtered to exclude their own role (see query filters below)
       const roleHierarchy = {
-        admin: ['staff', 'parent', 'student'], // Admin can see staff, parent, student (but not other admins)
-        staff: ['staff', 'parent', 'student']  // Staff can see staff, parent, student (but not admin or other staff)
+        admin: ['staff_admin', 'staff', 'parent', 'student'], // Admin can see staff_admin, staff, parent, student (but not other admins)
+        staff_admin: ['staff', 'parent', 'student'], // Staff_admin can see staff, parent, student (but not admin or other staff_admins)
+        staff: ['parent', 'student']  // Staff can see parent, student (but not admin, staff_admin or other staff)
       };
   
       const allowedRoles = roleHierarchy[creatorRole as keyof typeof roleHierarchy];

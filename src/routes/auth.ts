@@ -12,7 +12,7 @@ import {
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticateToken, checkPermission } from '../middleware/auth.js';
 import { config } from '../config/index.js';
-import { register, login, createUser, forgotPassword, resetPassword, manualPasswordReset, getAllUsers } from '../controllers/authControllers.js';
+import { register, login, createUser, forgotPassword, manualPasswordReset,  } from '../controllers/authControllers.js';
 
 const router = Router();
 

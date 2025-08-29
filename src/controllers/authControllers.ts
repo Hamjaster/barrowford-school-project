@@ -8,8 +8,9 @@ import { sendUserCreationEmail } from '../utils/resend.js';
 // Helper function to validate role-specific user creation
 const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
   const roleHierarchy = {
-    admin: ['staff', 'parent', 'student'],
-    staff: ['staff', 'parent', 'student']
+    admin: ['staff_admin', 'staff', 'parent', 'student'],
+    staff_admin: ['staff', 'parent', 'student'],
+    staff: ['parent', 'student']
   };
 
   const allowedRoles = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
@@ -27,8 +28,9 @@ const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
 // Helper function to validate password reset permissions
 const canResetSpecificUserPassword = (creatorRole: string, targetRole: string) => {
   const resetPermissions = {
-    admin: ['staff', 'parent', 'student'],
-    staff: ['staff', 'parent', 'student']
+    admin: ['staff_admin', 'staff', 'parent', 'student'],
+    staff_admin: ['staff', 'parent', 'student'],
+    staff: ['parent', 'student']
   };
 
   const allowedRoles = resetPermissions[creatorRole as keyof typeof resetPermissions];
@@ -255,7 +257,7 @@ export const login = async (req: Request, res: Response) => {
  */
 export const createUser = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { email, password, first_name, last_name, role } = req.body;
+    const { email, password, first_name, last_name, role, parent_id } = req.body;
     const creatorRole = req.user.role;
 
     // Additional role-specific validation
@@ -281,6 +283,31 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
         success: false,
         error: 'Invalid role' 
       });
+    }
+
+    // Validate parent_id for students
+    if (role === 'student') {
+      if (!parent_id) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Parent ID is required for student accounts' 
+        });
+      }
+
+      // Verify parent exists and has 'parent' role
+      const { data: parentData, error: parentError } = await supabase
+        .from('app_user')
+        .select('id, role')
+        .eq('id', parent_id)
+        .eq('role', 'parent')
+        .single();
+
+      if (parentError || !parentData) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Invalid parent ID or parent not found' 
+        });
+      }
     }
 
     // Check if user already exists
@@ -350,16 +377,23 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     console.log(authData, 'authData')
     // Store profile data in app_user table
     if (authData.user) {
+      const insertData: any = {
+        auth_user_id: authData.user.id,
+        first_name,
+        last_name,
+        email: email,
+        password: await AuthUtils.hashPassword(password),
+        role,
+      };
+
+      // Add parent_id for students
+      if (role === 'student' && parent_id) {
+        // insertData.parent_id = parent_id; // REMOVE THIS when we have a proper DB
+      }
+
       const { error: insertError } = await supabase
         .from('app_user')
-        .insert({
-          auth_user_id: authData.user.id,
-          first_name,
-          last_name,
-          email: email,
-          password: await AuthUtils.hashPassword(password),
-          role,
-        });
+        .insert(insertData);
 
       if (insertError) {
         // If insert fails, delete auth user to keep things clean

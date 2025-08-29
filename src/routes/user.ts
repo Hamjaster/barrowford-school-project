@@ -7,6 +7,6 @@ import { getAllUsers } from '../controllers/userControllers.js';
 const router = Router();
 
 // User management routes
-router.get('/', authenticateToken, checkPermission('manage_users'), getAllUsers as any);
+router.get('/', authenticateToken, checkPermission('get_users'), getAllUsers as any);
 
 export default router;
