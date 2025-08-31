@@ -3,12 +3,14 @@ import { supabase } from '../db/supabase.js';
 import { AuthUtils } from '../utils/auth.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { createClient } from '@supabase/supabase-js';
+import { sendUserCreationEmail } from '../utils/resend.js';
 
 // Helper function to validate role-specific user creation
 const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
   const roleHierarchy = {
-    admin: ['staff', 'parent', 'student'],
-    staff: ['staff', 'parent', 'student']
+    admin: ['staff_admin', 'staff', 'parent', 'student'],
+    staff_admin: ['staff', 'parent', 'student'],
+    staff: ['parent', 'student']
   };
 
   const allowedRoles = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
@@ -26,8 +28,9 @@ const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
 // Helper function to validate password reset permissions
 const canResetSpecificUserPassword = (creatorRole: string, targetRole: string) => {
   const resetPermissions = {
-    admin: ['staff', 'parent', 'student'],
-    staff: ['staff', 'parent', 'student']
+    admin: ['staff_admin', 'staff', 'parent', 'student'],
+    staff_admin: ['staff', 'parent', 'student'],
+    staff: ['parent', 'student']
   };
 
   const allowedRoles = resetPermissions[creatorRole as keyof typeof resetPermissions];
@@ -254,7 +257,7 @@ export const login = async (req: Request, res: Response) => {
  */
 export const createUser = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { email, password, first_name, last_name, role } = req.body;
+    const { email, password, first_name, last_name, role, parent_id } = req.body;
     const creatorRole = req.user.role;
 
     // Additional role-specific validation
@@ -280,6 +283,31 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
         success: false,
         error: 'Invalid role' 
       });
+    }
+
+    // Validate parent_id for students
+    if (role === 'student') {
+      if (!parent_id) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Parent ID is required for student accounts' 
+        });
+      }
+
+      // Verify parent exists and has 'parent' role
+      const { data: parentData, error: parentError } = await supabase
+        .from('app_user')
+        .select('id, role')
+        .eq('id', parent_id)
+        .eq('role', 'parent')
+        .single();
+
+      if (parentError || !parentData) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Invalid parent ID or parent not found' 
+        });
+      }
     }
 
     // Check if user already exists
@@ -349,16 +377,23 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     console.log(authData, 'authData')
     // Store profile data in app_user table
     if (authData.user) {
+      const insertData: any = {
+        auth_user_id: authData.user.id,
+        first_name,
+        last_name,
+        email: email,
+        password: await AuthUtils.hashPassword(password),
+        role,
+      };
+
+      // Add parent_id for students
+      if (role === 'student' && parent_id) {
+        // insertData.parent_id = parent_id; // REMOVE THIS when we have a proper DB
+      }
+
       const { error: insertError } = await supabase
         .from('app_user')
-        .insert({
-          auth_user_id: authData.user.id,
-          first_name,
-          last_name,
-          email: email,
-          password: await AuthUtils.hashPassword(password),
-          role,
-        });
+        .insert(insertData);
 
       if (insertError) {
         // If insert fails, delete auth user to keep things clean
@@ -371,11 +406,27 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     }
     console.log("user added in app_user")
 
+    // Send welcome email to the newly created user
+    try {
+      await sendUserCreationEmail(
+        email,
+        first_name,
+        last_name,
+        role,
+        password,
+        username // Only provided for students
+      );
+      console.log(`Welcome email sent successfully to ${email}`);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail user creation if email fails, but log it
+      // The user is created successfully, email is just a bonus
+    }
 
     // Confirmation email has been sent manually via generateLink
     const responseData: any = {
       success: true,
-      message: `${role} account created successfully.`,
+      message: `${role} account created successfully. Welcome email sent to ${email}.`,
       user: {
         id: authData.user?.id,
         email: email,
@@ -424,17 +475,17 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     // If user doesn't exist in our system, don't reveal this information
     if (userError || !userData) {
-      return res.json({ 
-        success: true,
-        message: 'If an account with this email exists, a password reset link has been sent.' 
+      return res.status(400).json({ 
+        success: false,
+        message: 'There was an error sending the password reset email. ' 
       });
     }
 
     // Students cannot reset passwords via email (they need admin/staff to reset)
     if (userData.role === 'student') {
-      return res.json({ 
+      return res.status(400).json({ 
         success: true,
-        message: 'If an account with this email exists, a password reset link has been sent.' 
+        message: 'Students cannot reset passwords via email. Contact an admin or teacher to reset your password.' 
       });
     }
 
@@ -446,16 +497,23 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
     if (resetError) {
       console.error('Error sending password reset email:', resetError);
-      // Don't reveal specific error details to prevent email enumeration
-      return res.json({ 
-        success: true,
-        message: 'If an account with this email exists, a password reset link has been sent.' 
+      // if the resetError contains "is invalid" then return a message that the email is invalid
+      if (resetError.message.includes('is invalid')) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'Invalid email address' 
+        });
+      }
+      
+      return res.status(400).json({ 
+        success: false,
+        message: 'There was an error sending the password reset email. ' 
       });
     }
 
     console.log('Password reset email sent for:', email);
 
-    res.json({ 
+    res.status(200).json({ 
       success: true,
       message: 'If an account with this email exists, a password reset link has been sent.' 
     });
@@ -464,7 +522,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     console.error('Error in forgot password:', error);
     res.status(500).json({ 
       success: false,
-      error: 'Internal server error' 
+      message: 'Internal server error' 
     });
   }
 };
@@ -579,122 +637,7 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
-// GET ALL USERS - Get paginated list of users with search and filters
-export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const creatorRole = req.user.role;
-    const creatorUserId = req.user.userId; // Get the logged-in user's ID
-    const { 
-      page = 1, 
-      limit = 10, 
-      search = '', 
-      role = '', 
-      sortBy = 'created_at', 
-      sortOrder = 'desc' 
-    } = req.query;
 
-    // Only admin and staff can view all users
-    if (!['admin', 'staff'].includes(creatorRole)) {
-      return res.status(403).json({ 
-        success: false,
-        error: 'Insufficient permissions to view users' 
-      });
-    }
-
-    // Define role hierarchy - higher roles cannot be seen by lower roles
-    const roleHierarchy = {
-      admin: ['staff', 'parent', 'student'], // Admin can see staff, parent, student
-      staff: ['staff', 'parent', 'student']  // Staff can see staff, parent, student (but not admin)
-    };
-
-    const allowedRoles = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
-    
-    if (!allowedRoles) {
-      return res.status(403).json({ 
-        success: false,
-        error: 'Invalid role permissions' 
-      });
-    }
-
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const offset = (pageNum - 1) * limitNum;
-
-    // Build query
-    let query = supabase
-      .from('app_user')
-      .select('id, email, first_name, last_name, role, created_at, auth_user_id', { count: 'exact' });
-
-    // Exclude the logged-in user
-    query = query.neq('auth_user_id', creatorUserId);
-
-    // Filter by allowed roles only
-    query = query.in('role', allowedRoles);
-
-    // Add search filter
-    if (search) {
-      query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
-    }
-
-    // Add role filter (only if it's within allowed roles)
-    if (role && role !== 'all' && allowedRoles.includes(role)) {
-      query = query.eq('role', role);
-    }
-
-    // Add sorting
-    const validSortColumns = ['first_name', 'last_name', 'email', 'role', 'created_at'];
-    const sortColumn = validSortColumns.includes(sortBy as string) ? sortBy as string : 'created_at';
-    const order = sortOrder === 'asc' ? true : false;
-    
-    query = query.order(sortColumn, { ascending: order });
-
-    // Add pagination
-    query = query.range(offset, offset + limitNum - 1);
-
-    const { data: users, error, count } = await query;
-
-    if (error) {
-      console.error('Error fetching users:', error);
-      return res.status(400).json({ 
-        success: false,
-        error: 'Failed to fetch users' 
-      });
-    }
-
-    // Remove auth_user_id from the response for security
-    const sanitizedUsers = (users || []).map(user => {
-      const { auth_user_id, ...userWithoutAuthId } = user;
-      return userWithoutAuthId;
-    });
-
-    // Calculate pagination info
-    const totalPages = Math.ceil((count || 0) / limitNum);
-    const hasNextPage = pageNum < totalPages;
-    const hasPrevPage = pageNum > 1;
-
-    res.json({
-      success: true,
-      data: {
-        users: sanitizedUsers,
-        pagination: {
-          currentPage: pageNum,
-          totalPages,
-          totalUsers: count || 0,
-          usersPerPage: limitNum,
-          hasNextPage,
-          hasPrevPage
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('Error in getAllUsers:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Internal server error' 
-    });
-  }
-};
 
 // MANUAL PASSWORD RESET - Higher user resets lower user's password by email
 export const manualPasswordReset = async (req: AuthenticatedRequest, res: Response) => {
