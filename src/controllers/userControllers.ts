@@ -32,14 +32,30 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
         staff: ['parent', 'student']  // Staff can see parent, student (but not admin, staff_admin or other staff)
       };
   
-      const allowedRoles = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
+      // const allowedRoles: string[] | undefined = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
+      // console.log(allowedRoles)
       
-      if (!allowedRoles) {
-        return res.status(403).json({ 
-          success: false,
-          error: 'Invalid role permissions' 
-        });
-      }
+      // if (!allowedRoles && !allowedRoles.includes(role as string)) {
+      //   return res.status(403).json({ 
+      //     success: false,
+      //     error: 'Invalid role permissions' 
+      //   });
+      // }
+      const allowedRoles: string[] | undefined = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
+
+        if (!allowedRoles) {
+            return res.status(403).json({ 
+              success: false,
+              error: 'Invalid role permissions' 
+            });
+        }
+
+        if (role && role !== 'all' && !allowedRoles.includes(role as string)) {
+            return res.status(403).json({ 
+              success: false,
+              error: `You are not authorized to view users with role: ${role}` 
+            });
+        }
   
       const pageNum = parseInt(page as string);
       const limitNum = parseInt(limit as string);
