@@ -285,7 +285,8 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Validate parent_id for students
+    // Validate parent_id for students and store parent data
+    let parentData = null;
     if (role === 'student') {
       if (!parent_id) {
         return res.status(400).json({ 
@@ -295,19 +296,21 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       }
 
       // Verify parent exists and has 'parent' role
-      const { data: parentData, error: parentError } = await supabase
+      const { data: fetchedParentData, error: parentError } = await supabase
         .from('app_user')
-        .select('id, role')
+        .select('id, role, email, first_name, last_name')
         .eq('id', parent_id)
         .eq('role', 'parent')
         .single();
 
-      if (parentError || !parentData) {
+      if (parentError || !fetchedParentData) {
         return res.status(400).json({ 
           success: false,
           error: 'Invalid parent ID or parent not found' 
         });
       }
+      
+      parentData = fetchedParentData;
     }
 
     // Check if user already exists
@@ -408,15 +411,25 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
 
     // Send welcome email to the newly created user
     try {
+      // For students, send email to parent; for others, send to their own email
+      let emailRecipient = email;
+      let recipientName = `${first_name} ${last_name}`;
+      
+      if (role === 'student' && parentData) {
+        emailRecipient = parentData.email;
+        recipientName = `${parentData.first_name} ${parentData.last_name}`;
+      }
+      
       await sendUserCreationEmail(
-        email,
+        emailRecipient,
         first_name,
         last_name,
         role,
         password,
-        username // Only provided for students
+        username, // Only provided for students
+        role === 'student' ? parentData : null // Pass parent data for students
       );
-      console.log(`Welcome email sent successfully to ${email}`);
+      console.log(`Welcome email sent successfully to ${emailRecipient} ${role === 'student' ? '(parent)' : ''}`);
     } catch (emailError) {
       console.error('Failed to send welcome email:', emailError);
       // Don't fail user creation if email fails, but log it
@@ -424,9 +437,12 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Confirmation email has been sent manually via generateLink
+    const emailRecipientForMessage = role === 'student' && parentData ? parentData.email : email;
+    const emailRecipientNote = role === 'student' && parentData ? ' (sent to parent)' : '';
+    
     const responseData: any = {
       success: true,
-      message: `${role} account created successfully. Welcome email sent to ${email}.`,
+      message: `${role} account created successfully. Welcome email sent to ${emailRecipientForMessage}${emailRecipientNote}.`,
       user: {
         id: authData.user?.id,
         email: email,
@@ -493,7 +509,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const { data, error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`
     });
-    console.log(data,'after sending supabase EMAIL')
+    console.log(data,'AFTER sending SUPABASE EMAIL')
 
     if (resetError) {
       console.error('Error sending password reset email:', resetError);
