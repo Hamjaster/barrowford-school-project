@@ -12,13 +12,12 @@ import {
 import { asyncHandler, AppError } from '../middleware/errorHandler.js';
 import { authenticateToken, checkPermission } from '../middleware/auth.js';
 import { config } from '../config/index.js';
-import { register, login, createUser, forgotPassword, manualPasswordReset,  } from '../controllers/authControllers.js';
+import { login, createUser, forgotPassword, manualPasswordReset,  } from '../controllers/authControllers.js';
 
 const router = Router();
 
 // Public routes
 router.post('/login', login);
-router.post('/signup', register);
 
 // Protected routes - User creation (role-based)
 router.post('/create-user', authenticateToken, checkPermission('manage_users'), createUser as any);

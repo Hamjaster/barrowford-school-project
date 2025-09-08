@@ -45,238 +45,189 @@ const canResetSpecificUserPassword = (creatorRole: string, targetRole: string) =
   return { allowed: true, message: '' };
 };
 
-// Helper function to convert student username to email
-const findStudentEmailByUsername = async (username: string): Promise<string | null> => {
+// Helper function to create role-specific table entries
+const createRoleSpecificEntry = async (role: string, additionalData: any = {}) => {
   try {
-    console.log('Looking up email for username:', username);
-    
-    // Look up all students to find matching username
-    const { data: userData, error: userError } = await supabase
-      .from('app_user')
-      .select('email, role, first_name, last_name')
-      .eq('role', 'student');
+    switch (role) {
+      case 'admin':
+        const { error: adminError } = await supabase
+          .from('admins')
+          .insert({
+            auth_user_id: additionalData.auth_user_id,
+            first_name: additionalData.first_name,
+            last_name: additionalData.last_name,
+            email: additionalData.email,
+            
+          });
+        if (adminError) throw adminError;
+        break;
 
-    if (userError) {
-      console.error('Error looking up username:', userError);
-      return null;
+      case 'staff_admin':
+        const { error: staffAdminError } = await supabase
+        .from('staff_admins')
+        .insert({
+          auth_user_id: additionalData.auth_user_id,
+          first_name: additionalData.first_name,
+          last_name: additionalData.last_name,
+          email: additionalData.email,
+        });
+      if (staffAdminError) throw staffAdminError;
+      break;
+      case 'staff':
+        const { error: teacherError } = await supabase
+          .from('staffs')
+          .insert({
+            auth_user_id: additionalData.auth_user_id,
+            year_group_id: additionalData.year_group_id || null,
+            class_id: additionalData.class_id || null,
+            email: additionalData.email,
+            first_name: additionalData.first_name,
+            last_name: additionalData.last_name,
+          });
+        if (teacherError) throw teacherError;
+        break;
+
+      case 'parent':
+        const { error: parentError, data: parentData } = await supabase
+          .from('parents')
+          .insert({
+            auth_user_id: additionalData.auth_user_id,
+            first_name: additionalData.first_name,
+            last_name: additionalData.last_name,
+            email: additionalData.email,
+          });
+          console.log("Parent error", parentError);
+          console.log("Parent data", parentData);
+        if (parentError) throw parentError;
+        break;
+
+      case 'student':
+        const { error: studentError } = await supabase
+          .from('students')
+          .insert({
+            auth_user_id: additionalData.auth_user_id,
+            year_group_id: additionalData.year_group_id || null,
+            class_id: additionalData.class_id || null,
+            username: additionalData.username,
+            email: additionalData.email,
+            first_name: additionalData.first_name,
+            last_name: additionalData.last_name,
+          });
+        if (studentError) throw studentError;
+
+        // Create parent-student relationship if parent_id is provided
+        if (additionalData.parent_id) {
+
+          // Get the student's ID from the students table
+          const { data: studentData, error: studentLookupError } = await supabase
+            .from('students')
+            .select('id')
+            .eq('auth_user_id', additionalData.auth_user_id)
+            .single();
+
+          if (studentLookupError || !studentData) {
+            throw new Error('Student not found in students table');
+          }
+
+          // Create the relationship
+          const { error: relationshipError } = await supabase
+            .from('parentstudentrelationship')
+            .insert({
+              parent_id: additionalData.parent_id,
+              student_id: studentData.id
+            });
+
+          if (relationshipError) throw relationshipError;
+        }
+        break;
+
+      default:
+        // No additional table entry needed for other roles
+        break;
     }
-
-    if (!userData || userData.length === 0) {
-      return null;
-    }
-
-    // Find the student whose generated username matches the provided username
-    const matchedUser = userData.find(user => {
-      // Generate the expected username for this student
-      const expectedUsername = AuthUtils.generateUsername(user.first_name, user.last_name);
-      
-      // Also check for username with suffix (in case of duplicates)
-      // The suffix would be a number appended to the base username
-      const baseUsername = `${user.first_name.toLowerCase().trim()}.${user.last_name.toLowerCase().trim()}`;
-      
-      return expectedUsername === username || 
-             username.startsWith(baseUsername) || 
-             expectedUsername === username.toLowerCase();
-    });
-
-    if (!matchedUser) {
-      return null;
-    }
-
-    console.log('Converted username to email:', matchedUser.email);
-    return matchedUser.email;
-    
   } catch (error) {
-    console.error('Error in findStudentEmailByUsername:', error);
-    return null;
+    console.error(`Error creating ${role} entry:`, error);
+    throw error;
   }
 };
 
-// REGISTER
-export const register = async (req: Request, res: Response) => {
-  const { email, password, dob, first_name, last_name, role } = req.body;
 
-  if (!email || !password || !dob || !first_name || !last_name || !role) {
-    return res.status(400).json({ error: 'All fields are required' });
-  }
 
-  if (!['student', 'teacher', 'staff', 'admin'].includes(role)) {
-    return res.status(400).json({ error: 'Invalid role' });
-  }
-
-  // Create user in Supabase Auth
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
-    password
-  });
-
-  if (authError) return res.status(400).json({ error: authError.message });
-
-  // Store profile data in app_user
-  if (authData.user) {
-    const { error: insertError } = await supabase
-    .from('app_user')
-    .insert({
-      auth_user_id: authData.user.id, // UUID
-      dob,
-      first_name,
-      last_name,
-      password : AuthUtils.hashPassword(password),
-      email,
-      role
-    });
-  
-
-    if (insertError) {
-      // If insert fails, delete auth user to keep things clean
-      await supabase.auth.admin.deleteUser(authData.user.id);
-      return res.status(400).json({ error: insertError.message });
-    }
-  }
-
-  res.json({ message: 'Registration successful. Please verify your email.' });
-};
-
-/**
- * LOGIN - Universal login endpoint supporting both email and username authentication
- * 
- * Features:
- * - Staff/Admin/Parents: Login with email + password
- * - Students: Login with username + password (username format: firstname.lastname)
- * - Automatic username-to-email conversion for student authentication
- * - Handles username collisions (with numeric suffixes)
- * - Returns JWT token with role-based permissions
- * - Includes username in response for student accounts
- * 
- * @param req.body.email - Email address (for non-student users)
- * @param req.body.username - Username (for student users, format: firstname.lastname)
- * @param req.body.password - User password
- * @returns JWT access token and user profile information
- */
 export const login = async (req: Request, res: Response) => {
   const { email, username, password } = req.body;
 
-  // Validate input - either email or username must be provided
   if ((!email && !username) || !password) {
-    return res.status(400).json({ 
-      error: 'Email/username and password are required' 
-    });
-  }
-
-  // If both email and username are provided, prioritize email
-  if (email && username) {
-    return res.status(400).json({ 
-      error: 'Please provide either email or username, not both' 
-    });
+    return res.status(400).json({ error: 'Email/username and password are required' });
   }
 
   let emailToUse = email;
 
-  // If username is provided, convert it to email (for students)
   if (username && !email) {
-    emailToUse = await findStudentEmailByUsername(username);
-    
-    if (!emailToUse) {
-      return res.status(400).json({ error: 'Invalid username or password' });
-    }
+    // Only students use username
+    emailToUse = username + '@school.com';
   }
-
-  // Authenticate with Supabase using email
+  
   const { data, error } = await supabase.auth.signInWithPassword({
     email: emailToUse!,
     password
   });
-  
-  if (error) {
-    console.error('Authentication error:', error);
-    return res.status(400).json({ error: 'Invalid email/username or password' });
+
+  if (error) return res.status(400).json({ error: 'Invalid email/username or password' });
+
+  // Fetch user role/profile
+  console.log("Finding user by email", emailToUse);
+  const userProfile = await AuthUtils.findUserByEmail(emailToUse!);
+  if (!userProfile) {
+    return res.status(404).json({ error: 'User profile not found' });
   }
 
-  console.log(data.user?.id, 'uuid');
-  
-  // Get role and profile data from app_user table
-  const { data: roleData, error: roleError } = await supabase
-    .from('app_user')
-    .select('role, first_name, last_name, dob, email')
-    .eq('auth_user_id', data.user?.id)
-    .single();
-
-  console.log(roleData, 'role DATA');
-
-  if (roleError) {
-    console.error('Error fetching user role:', roleError);
-    return res.status(400).json({ error: 'User profile not found' });
-  }
-
-  // Generate JWT token
   const authToken = AuthUtils.generateAccessToken({
     userId: data.user?.id,
-    role: roleData.role,
-    email: data.user?.email
+    role: userProfile.role,
+    email: userProfile.email
   });
 
-  // Prepare response data
-  const responseData: any = {
+  const response: any = {
     access_token: authToken,
     user: {
       id: data.user?.id,
-      email: data.user?.email,
-      role: roleData.role,
-      first_name: roleData.first_name,
-      last_name: roleData.last_name,
-      dob: roleData.dob
+      email: userProfile.email,
+      role: userProfile.role,
+      first_name: userProfile.first_name,
+      last_name: userProfile.last_name,
+      dob: userProfile.dob
     }
   };
 
-  // Add username for students
-  if (roleData.role === 'student') {
-    const studentUsername = AuthUtils.generateUsername(roleData.first_name, roleData.last_name);
-    responseData.user.username = studentUsername;
+  if (userProfile.role === 'student') {
+    response.user.username = AuthUtils.generateUsername(userProfile.first_name, userProfile.last_name);
   }
 
-  res.json(responseData);
+  res.json(response);
 };
 
-/**
- * CREATE USER - Role-based user creation API
- * 
- * Allows higher-level roles to create lower-level users based on school hierarchy:
- * - Admin: Can create staff_admin, staff, parent, student accounts
- * - Staff Admin: Can create staff, parent, student accounts  
- * - Staff: Can create parent, student accounts
- * 
- * Features:
- * - All users require email and password (provided by creator)
- * - Students get username format: firstname.lastname (for login purposes)
- * - All users receive email confirmation via Supabase Auth
- * - Automatic username collision handling for students
- * - Password validation for all provided passwords
- * 
- * @param req - Authenticated request with user role info
- * @param res - Response object
- */
 export const createUser = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { email, password, first_name, last_name, role, parent_id } = req.body;
+    const { 
+      email, // for non-students
+      username, // for students only
+      password, 
+      first_name, 
+      last_name, 
+      role, 
+      parent_id,
+      year_group_id,
+      class_id
+    } = req.body;
     const creatorRole = req.user.role;
+    let emailToUse = email;
 
-    // Additional role-specific validation
-    const canCreateRole = canCreateSpecificRole(creatorRole, role);
-    if (!canCreateRole.allowed) {
-      return res.status(403).json({ 
-        success: false,
-        error: canCreateRole.message 
-      });
+    if (role === 'student' && !email) {
+      // generate an imaginary email from username
+      emailToUse = username + '@school.com';
     }
 
-    // Validate required fields
-    if (!email || !password || !first_name || !last_name || !role) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Email, password, first name, last name, and role are required' 
-      });
-    }
-
+    
     // Validate role
     if (!['admin', 'staff_admin', 'staff', 'parent', 'student'].includes(role)) {
       return res.status(400).json({ 
@@ -284,8 +235,26 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
         error: 'Invalid role' 
       });
     }
+    // Additional role-specific validation
+    const canCreateRole = canCreateSpecificRole(creatorRole, role);
+    if (!canCreateRole.allowed) {                                                                                                                                                                                                 4
+      return res.status(403).json({ 
+        success: false,
+        error: canCreateRole.message 
+      });
+    }
+
+    // Validate required fields
+    if (!emailToUse || !password || !first_name || !last_name || !role) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Email, password, first name, last name, and role are required' 
+      });
+    }
+
 
     // Validate parent_id for students
+    let parentData = null;
     if (role === 'student') {
       if (!parent_id) {
         return res.status(400).json({ 
@@ -294,66 +263,42 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
         });
       }
 
-      // Verify parent exists and has 'parent' role
-      const { data: parentData, error: parentError } = await supabase
-        .from('app_user')
-        .select('id, role')
+
+      // Verify parent exists in parents table
+      const { data: fetchedParentData, error: parentError } = await supabase
+        .from('parents')
+        .select('id, email, first_name, last_name')
         .eq('id', parent_id)
-        .eq('role', 'parent')
         .single();
 
-      if (parentError || !parentData) {
+      if (parentError || !fetchedParentData) {
         return res.status(400).json({ 
           success: false,
           error: 'Invalid parent ID or parent not found' 
         });
       }
+      
+      parentData = fetchedParentData;
     }
 
-    // Check if user already exists
-    const { data: existingUser } = await supabase
-      .from('app_user')
-      .select('email')
-      .eq('email', email)
-      .single();
+    // Check if user already exists across all role tables
+    const emailChecks = await Promise.all([
+      supabase.from('admins').select('email').eq('email', emailToUse).single(),
+      supabase.from('staff_admins').select('email').eq('email', emailToUse).single(),
+      supabase.from('staffs').select('email').eq('email', emailToUse).single(),
+      supabase.from('parents').select('email').eq('email', emailToUse).single(),
+      supabase.from('students').select('email').eq('email', emailToUse).single(),
+    ]);
 
+    const existingUser = emailChecks.find(check => check.data && !check.error);
     if (existingUser) {
       return res.status(400).json({ 
         success: false,
         error: 'User with this email already exists' 
       });
     }
-
-    // Validate password <-- REMOVE THIS
-    // const passwordValidation = AuthUtils.validatePassword(password);
-    // if (!passwordValidation.isValid) {
-    //   return res.status(400).json({ 
-    //     success: false,
-    //     error: `Password validation failed: ${passwordValidation.errors.join(', ')}` 
-    //   });
-    // }
-
-    // Generate username for students (firstname.lastname format)
-    let username = undefined;
-    if (role === 'student') {
-      username = AuthUtils.generateUsername(first_name, last_name);
-      
-      // Check if username already exists and add suffix if needed
-      const { data: existingUsername } = await supabase
-        .from('app_user')
-        .select('email')
-        .ilike('email', `${username}%`)
-        .eq('role', 'student');
-
-      if (existingUsername && existingUsername.length > 0) {
-        username = AuthUtils.generateUsername(first_name, last_name, (existingUsername.length + 1).toString());
-      }
-    }
-
-    // Use the provided email for all users
-    const emailToUse = email;
-
-    // Create user in Supabase Auth - create unconfirmed user first
+    console.log("EMAIL TO USE", emailToUse);
+    // Create user in Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email: emailToUse,
       password: password,
@@ -364,8 +309,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
         role
       }
     });
-    console.log("user created in auth", authData)
-    
+    console.log("User created in auth", authData);
 
     if (authError) {
       return res.status(400).json({ 
@@ -374,56 +318,63 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    console.log(authData, 'authData')
-    // Store profile data in app_user table
+    // Create user directly in role-specific table
     if (authData.user) {
-      const insertData: any = {
-        auth_user_id: authData.user.id,
-        first_name,
-        last_name,
-        email: email,
-        password: await AuthUtils.hashPassword(password),
-        role,
-      };
+      try {
+        const userData = {
+          first_name,
+          last_name,
+          email: emailToUse,
+          auth_user_id: authData.user.id,
+          year_group_id,
+          class_id,
+          parent_id,
+          username,
+        };
 
-      // Add parent_id for students
-      if (role === 'student' && parent_id) {
-        // insertData.parent_id = parent_id; // REMOVE THIS when we have a proper DB
-      }
+        console.log("User data", userData);
 
-      const { error: insertError } = await supabase
-        .from('app_user')
-        .insert(insertData);
+        const createdUser = await createRoleSpecificEntry( role, userData);
+        console.log(`${role} entry created successfully`, createdUser);
 
-      if (insertError) {
-        // If insert fails, delete auth user to keep things clean
+      } catch (roleError) {
+        console.error(`Failed to create ${role} entry:`, roleError);
+        // If role-specific creation fails, clean up auth user
         await supabase.auth.admin.deleteUser(authData.user.id);
         return res.status(400).json({ 
           success: false,
-          error: insertError.message 
+          error: `Failed to create ${role} profile: ${roleError}` 
         });
       }
     }
-    console.log("user added in app_user")
 
     // Send welcome email to the newly created user
     try {
+      // For students, send email to parent; for others, send to their own email
+      let emailRecipient = emailToUse;
+      let recipientName = `${first_name} ${last_name}`;
+      
+      if (role === 'student' && parentData) {
+        emailRecipient = parentData.email;
+        recipientName = `${parentData.first_name} ${parentData.last_name}`;
+      }
+      
       await sendUserCreationEmail(
-        email,
+        emailRecipient,
         first_name,
         last_name,
         role,
         password,
-        username // Only provided for students
+        username, // Only provided for students
+        role === 'student' ? parentData : null // Pass parent data for students
       );
-      console.log(`Welcome email sent successfully to ${email}`);
+      console.log(`Welcome email sent successfully to ${emailRecipient} ${role === 'student' ? '(parent)' : ''}`);
     } catch (emailError) {
       console.error('Failed to send welcome email:', emailError);
       // Don't fail user creation if email fails, but log it
       // The user is created successfully, email is just a bonus
     }
 
-    //handle both cases—capitalize the first letter and replace underscores with spaces
       const formatRole = (role: string) => {
       return role
         .split('_') // Split by underscore
@@ -431,14 +382,19 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
         .join(' '); // Join with space
     };
 
+    // Prepare response
+    const emailRecipientForMessage = role === 'student' && parentData ? parentData.email : emailToUse;
+    const emailRecipientNote = role === 'student' && parentData ? ' (sent to parent)' : '';
+
+
 
     // Confirmation email has been sent manually via generateLink
     const responseData: any = {
       success: true,
-      message: `${formatRole(role)} account created successfully. Welcome email sent to ${email}.`,
+      message: `${formatRole(role)} account created successfully. Welcome email sent to ${emailRecipientForMessage}${emailRecipientNote}.`,
       user: {
         id: authData.user?.id,
-        email: email,
+        email: emailToUse,
         role,
         first_name,
         last_name,
@@ -463,81 +419,34 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
-// FORGOT PASSWORD - Request password reset link using Supabase Auth
+
 export const forgotPassword = async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
+  const { email } = req.body;
 
-    if (!email) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Email is required' 
-      });
-    }
+  if (!email) return res.status(400).json({ error: 'Email is required' });
 
-    // Check if user exists in our app_user table and get their role
-    const { data: userData, error: userError } = await supabase
-      .from('app_user')
-      .select('role, first_name, last_name')
-      .eq('email', email)
-      .single();
+  const user = await AuthUtils.findUserByEmail(email);
+  if (!user) {
+    return res.status(200).json({ success: true, message: 'If an account exists, a reset link has been sent' });
+  }
 
-    // If user doesn't exist in our system, don't reveal this information
-    if (userError || !userData) {
-      return res.status(400).json({ 
-        success: false,
-        message: 'There was an error sending the password reset email. ' 
-      });
-    }
-
-    // Students cannot reset passwords via email (they need admin/staff to reset)
-    if (userData.role === 'student') {
-      return res.status(400).json({ 
-        success: true,
-        message: 'Students cannot reset passwords via email. Contact an admin or teacher to reset your password.' 
-      });
-    }
-
-    // Use Supabase's built-in password reset functionality
-    const { data, error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`
-    });
-    console.log(data,'after sending supabase EMAIL')
-
-    if (resetError) {
-      console.error('Error sending password reset email:', resetError);
-      // if the resetError contains "is invalid" then return a message that the email is invalid
-      if (resetError.message.includes('is invalid')) {
-        return res.status(400).json({ 
-          success: false,
-          message: 'Invalid email address' 
-        });
-      }
-      
-      return res.status(400).json({ 
-        success: false,
-        message: 'There was an error sending the password reset email. ' 
-      });
-    }
-
-    console.log('Password reset email sent for:', email);
-
-    res.status(200).json({ 
-      success: true,
-      message: 'If an account with this email exists, a password reset link has been sent.' 
-    });
-
-  } catch (error) {
-    console.error('Error in forgot password:', error);
-    res.status(500).json({ 
+  if (user.role === 'student') {
+    return res.status(400).json({
       success: false,
-      message: 'Internal server error' 
+      message: 'Students cannot reset passwords via email. Contact an admin/teacher.'
     });
   }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.FRONTEND_URL}/reset-password`
+  });
+
+  if (error) return res.status(400).json({ success: false, message: 'Failed to send reset email' });
+
+  res.json({ success: true, message: 'Password reset email sent' });
 };
 
 // RESET PASSWORD - Update password using Supabase Auth (called from frontend after email link click)
-// This endpoint is used by the frontend when user clicks reset link and wants to set new password
 export const resetPassword = async (req: Request, res: Response) => {
   try {
     const { accessToken, refreshToken, newPassword } = req.body;
@@ -582,13 +491,9 @@ export const resetPassword = async (req: Request, res: Response) => {
     }
 
     // Check if user exists in our app_user table and get their role
-    const { data: userData, error: appUserError } = await supabase
-      .from('app_user')
-      .select('role, email')
-      .eq('auth_user_id', user.id)
-      .single();
+     const userData = await AuthUtils.findUserByAuthUserId(user.id);
 
-    if (appUserError || !userData) {
+    if (!userData) {
       return res.status(404).json({ 
         success: false,
         error: 'User not found in system' 
@@ -603,13 +508,13 @@ export const resetPassword = async (req: Request, res: Response) => {
       });
     }
 
-    console.log("CREATED CLIENT !", userSupabase)
-    console.log('GOT SESSION !')
+    console.log("CREATED CLIENT !", userSupabase);
+    console.log('GOT SESSION !');
     // Update the password using the authenticated session
     const { error: updateError } = await userSupabase.auth.updateUser({
       password: newPassword
     });
-    console.log('UPDATED PASSWORD !')
+    console.log('UPDATED PASSWORD !');
     
     if (updateError) {
       console.error('Error updating password:', updateError);
@@ -617,19 +522,6 @@ export const resetPassword = async (req: Request, res: Response) => {
         success: false,
         error: updateError.message || 'Failed to update password' 
       });
-    }
-
-    // Update password in app_user table as well for consistency
-    const { error: appUserUpdateError } = await supabase
-      .from('app_user')
-      .update({
-        password: await AuthUtils.hashPassword(newPassword)
-      })
-      .eq('auth_user_id', user.id);
-
-    if (appUserUpdateError) {
-      console.error('Error updating password in app_user:', appUserUpdateError);
-      // Don't fail the request if this fails, as the auth password was updated successfully
     }
 
     res.json({ 
@@ -646,8 +538,6 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
-
-
 // MANUAL PASSWORD RESET - Higher user resets lower user's password by email
 export const manualPasswordReset = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -661,23 +551,10 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
       });
     }
 
-    // Validate password strength <-- REMOVE THIS
-    // const passwordValidation = AuthUtils.validatePassword(newPassword);
-    // if (!passwordValidation.isValid) {
-    //   return res.status(400).json({ 
-    //     success: false,
-    //     error: `Password validation failed: ${passwordValidation.errors.join(', ')}` 
-    //   });
-    // }
-
     // Get target user details by email
-    const { data: targetUser, error: targetError } = await supabase
-      .from('app_user')
-      .select('id, role, email, auth_user_id')
-      .eq('email', email)
-      .single();
+    const targetUser = await AuthUtils.findUserByEmail(email);
 
-    if (targetError || !targetUser) {
+    if (!targetUser) {
       return res.status(404).json({ 
         success: false,
         error: 'Target user not found' 
@@ -692,33 +569,16 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
         error: canResetPassword.message 
       });
     }
-console.log('updating password in auth')    // Update password in Supabase Auth
+
+    console.log('updating password in auth');
+    // Update password in Supabase Auth
     const { error: authError } = await supabase.auth.admin.updateUserById(
       targetUser.auth_user_id,
       { password: newPassword }
     );
-    
 
     if (authError) {
       console.error('Error updating password in auth:', authError);
-      return res.status(400).json({ 
-        success: false,
-        error: 'Failed to update password' 
-      });
-    }
-
-    // Update password in app_user table
-    const { error: updateError } = await supabase
-      .from('app_user')
-      .update({
-        password: await AuthUtils.hashPassword(newPassword),
-        password_reset_token: null,
-        password_reset_expires: null
-      })
-      .eq('id', targetUser.id);
-
-    if (updateError) {
-      console.error('Error updating password in app_user:', updateError);
       return res.status(400).json({ 
         success: false,
         error: 'Failed to update password' 
