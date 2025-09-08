@@ -375,13 +375,23 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       // The user is created successfully, email is just a bonus
     }
 
+      const formatRole = (role: string) => {
+      return role
+        .split('_') // Split by underscore
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize each word
+        .join(' '); // Join with space
+    };
+
     // Prepare response
     const emailRecipientForMessage = role === 'student' && parentData ? parentData.email : emailToUse;
     const emailRecipientNote = role === 'student' && parentData ? ' (sent to parent)' : '';
-    
+
+
+
+    // Confirmation email has been sent manually via generateLink
     const responseData: any = {
       success: true,
-      message: `${role} account created successfully. Welcome email sent to ${emailRecipientForMessage}${emailRecipientNote}.`,
+      message: `${formatRole(role)} account created successfully. Welcome email sent to ${emailRecipientForMessage}${emailRecipientNote}.`,
       user: {
         id: authData.user?.id,
         email: emailToUse,
