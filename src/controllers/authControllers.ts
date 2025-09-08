@@ -423,10 +423,19 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       // The user is created successfully, email is just a bonus
     }
 
+    //handle both cases—capitalize the first letter and replace underscores with spaces
+      const formatRole = (role: string) => {
+      return role
+        .split('_') // Split by underscore
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize each word
+        .join(' '); // Join with space
+    };
+
+
     // Confirmation email has been sent manually via generateLink
     const responseData: any = {
       success: true,
-      message: `${role} account created successfully. Welcome email sent to ${email}.`,
+      message: `${formatRole(role)} account created successfully. Welcome email sent to ${email}.`,
       user: {
         id: authData.user?.id,
         email: email,
