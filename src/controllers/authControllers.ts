@@ -367,13 +367,20 @@ parentDataList = fetchedParents;
       // The user is created successfully, email is just a bonus
     }
 
+      const formatRole = (role: string) => {
+      return role
+        .split('_') // Split by underscore
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize each word
+        .join(' '); // Join with space
+    };
+
     // Prepare response
     const emailRecipientForMessage = role === 'student' && parentDataList.length > 0 ? parentDataList[0].email : emailToUse;
     const emailRecipientNote = role === 'student' && parentDataList.length > 0 ? ' (sent to parent)' : '';
     
     const responseData: any = {
       success: true,
-      message: `${role} account created successfully. Welcome email sent to ${emailRecipientForMessage}${emailRecipientNote}.`,
+      message: `${formatRole(role)} account created successfully. Welcome email sent to ${emailRecipientForMessage}${emailRecipientNote}.`,
       user: {
         id: authData.user?.id,
         email: emailToUse,

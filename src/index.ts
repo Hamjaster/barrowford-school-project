@@ -21,11 +21,32 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
+const allowedOrigins = [
+  config.frontendUrl,
+  'http://localhost:3000',
+  'http://localhost:5173',
+  // TODO: fix this laterr
+  'https://nybble-bradford-school-frontend.vercel.app'
+];
+
+// Remove duplicates and filter out undefined values
+const uniqueOrigins = [...new Set(allowedOrigins.filter(origin => origin))];
+
 app.use(cors({
-  origin: [config.frontendUrl, 'http://localhost:3000', 'http://localhost:5173'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (uniqueOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
 // Rate limiting
@@ -85,7 +106,8 @@ const startServer = async () => {
       console.log(`🚀 Server running on http://localhost:${config.port}`);
       console.log(`📝 Environment: ${config.nodeEnv}`);
       console.log(`🔗 API Base URL: http://localhost:${config.port}/api`);
-   
+      console.log(`🌐 Allowed CORS origins:`, uniqueOrigins);
+
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
