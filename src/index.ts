@@ -9,6 +9,10 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 // Import routes
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
+import personalSectionRoutes from './routes/personalSection.js';
+import studentRoutes from './routes/student.js';
+import teacherRoutes from './routes/teacher.js';
+import parentRoutes from './routes/parent.js';
 
 
 const app = express();
@@ -70,6 +74,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/personalSection', personalSectionRoutes);
+app.use('/api/student', studentRoutes);
+app.use('/api/teacher', teacherRoutes);
+app.use('/api/parent', parentRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

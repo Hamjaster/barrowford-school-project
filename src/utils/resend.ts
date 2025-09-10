@@ -43,14 +43,14 @@ export const generateUserCreationEmail = (
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to Nybble Bradford School</title>
+        <title>Welcome to Barrowford School</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
             <!-- Header -->
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
                 <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
-                    🎓 ${isStudentEmailToParent ? 'Student Account Created' : 'Welcome to Nybble Bradford School'}
+                    🎓 ${isStudentEmailToParent ? 'Student Account Created' : 'Welcome to Barrowford School'}
                 </h1>
                 <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 16px;">
                     ${isStudentEmailToParent ? `A student account has been created for ${fullName}` : 'Your account has been created successfully!'}
@@ -187,12 +187,12 @@ export const generateUserCreationEmail = (
                     Need help? Contact our support team or visit our help center.
                 </p>
                 <p style="color: #a0aec0; margin: 0; font-size: 12px;">
-                    This is an automated email from Nybble Bradford School Portal. 
+                    This is an automated email from Barrowford School Portal. 
                     Please do not reply to this email.
                 </p>
                 <div style="margin-top: 15px;">
                     <p style="color: #a0aec0; margin: 0; font-size: 12px;">
-                        © ${new Date().getFullYear()} Nybble Bradford School. All rights reserved.
+                        © ${new Date().getFullYear()} Barrowford School. All rights reserved.
                     </p>
                 </div>
             </div>
@@ -213,8 +213,8 @@ export const sendUserCreationEmail = async (
   parentData?: any
 ) => {
   const subject = role === 'student' && parentData 
-    ? `🎓 Student Account Created for ${firstName} ${lastName} - Nybble Bradford School`
-    : `🎓 Welcome to Nybble Bradford School - Your Account is Ready!`;
+        ? `🎓 Student Account Created for ${firstName} ${lastName} - Barrowford School`
+    : `🎓 Welcome to Barrowford School - Your Account is Ready!`;
   const html = generateUserCreationEmail(firstName, lastName, role, email, password, username, parentData);
   
   return await sendEmail(email, subject, html);

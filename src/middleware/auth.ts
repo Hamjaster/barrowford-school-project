@@ -19,21 +19,27 @@ const permissions = {
   admin: [
     "manage_users",
     "get_users",
+    "manage_student_images"
 
   ],
   staff_admin: [
     "manage_users",
     "get_users",
+    "manage_student_images"
   ],
   staff: [
     "manage_users",
     "get_users",
+    "manage_student_images",
+    "get_assigned_students"
   ],
   parent: [
-
+    "view_children"
   ],
   student: [
-   
+    "manage_personal_section",
+    "manage_student_pages",
+    "manage_own_images"
   ]
 };
 
@@ -90,7 +96,6 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     });
   }
 };
-
 // Legacy role-based middlewares (kept for backward compatibility if needed)
 // You can remove these if not used elsewhere in the codebase
 export const requireRole = (allowedRoles: string[]) => {
