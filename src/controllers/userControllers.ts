@@ -2,124 +2,143 @@ import { AuthenticatedRequest } from "../middleware/auth.js";
 import { Response } from "express";
 import { supabase } from "../db/supabase.js";
 
-// GET ALL USERS - Get paginated list of users with search and filters
 export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const creatorRole = req.user.role;
-      const creatorUserId = req.user.userId; // Get the logged-in user's ID
-      const { 
-        page = 1, 
-        limit = 10, 
-        search = '', 
-        role = '', 
-        sortBy = 'created_at', 
-        sortOrder = 'desc' 
-      } = req.query;
-  
-      // Only admin, staff_admin and staff can view all users
-      if (!['admin', 'staff_admin', 'staff'].includes(creatorRole)) {
-        return res.status(403).json({ 
-          success: false,
-          error: 'Insufficient permissions to view users' 
-        });
-      }
-  
-      // Define role hierarchy - higher roles cannot be seen by lower roles
-      // Note: Users will also be filtered to exclude their own role (see query filters below)
-      const roleHierarchy = {
-        admin: ['staff_admin', 'staff', 'parent', 'student'], // Admin can see staff_admin, staff, parent, student (but not other admins)
-        staff_admin: ['staff', 'parent', 'student'], // Staff_admin can see staff, parent, student (but not admin or other staff_admins)
-        staff: ['parent', 'student']  // Staff can see parent, student (but not admin, staff_admin or other staff)
-      };
-  
-      const allowedRoles = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
-      
-      if (!allowedRoles) {
-        return res.status(403).json({ 
-          success: false,
-          error: 'Invalid role permissions' 
-        });
-      }
-  
-      const pageNum = parseInt(page as string);
-      const limitNum = parseInt(limit as string);
-      const offset = (pageNum - 1) * limitNum;
-  
-      // Build query
-      let query = supabase
-        .from('app_user')
-        .select('id, email, first_name, last_name, role, created_at, auth_user_id', { count: 'exact' });
-  
-      // Exclude the logged-in user
-      query = query.neq('auth_user_id', creatorUserId);
-  
-      // Filter by allowed roles only
-      query = query.in('role', allowedRoles);
-  
-      // Exclude users with the same role as the requester
-      query = query.neq('role', creatorRole);
-  
-      // Add search filter
-      if (search) {
-        query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`);
-      }
-  
-      // Add role filter (only if it's within allowed roles and not the same as creator's role)
-      if (role && role !== 'all' && allowedRoles.includes(role as string) && role !== creatorRole) {
-        query = query.eq('role', role);
-      }
-  
-      // Add sorting
-      const validSortColumns = ['first_name', 'last_name', 'email', 'role', 'created_at'];
-      const sortColumn = validSortColumns.includes(sortBy as string) ? sortBy as string : 'created_at';
-      const order = sortOrder === 'asc' ? true : false;
-      
-      query = query.order(sortColumn, { ascending: order });
-  
-      // Add pagination
-      query = query.range(offset, offset + limitNum - 1);
-  
-      const { data: users, error, count } = await query;
-  
-      if (error) {
-        console.error('Error fetching users:', error);
-        return res.status(400).json({ 
-          success: false,
-          error: 'Failed to fetch users' 
-        });
-      }
-  
-      // Remove auth_user_id from the response for security
-      const sanitizedUsers = (users || []).map(user => {
-        const { auth_user_id, ...userWithoutAuthId } = user;
-        return userWithoutAuthId;
-      });
-  
-      // Calculate pagination info
-      const totalPages = Math.ceil((count || 0) / limitNum);
-      const hasNextPage = pageNum < totalPages;
-      const hasPrevPage = pageNum > 1;
-  
-      res.json({
-        success: true,
-        data: {
-          users: sanitizedUsers,
-          pagination: {
-            currentPage: pageNum,
-            totalPages,
-            totalUsers: count || 0,
-            usersPerPage: limitNum,
-            hasNextPage,
-            hasPrevPage
-          }
-        }
-      });
-  
-    } catch (error) {
-      console.error('Error in getAllUsers:', error);
-      res.status(500).json({ 
+  try {
+    const creatorRole = req.user.role;
+    const creatorUserId = req.user.userId;
+
+    const {
+      page = 1,
+      limit = 10,
+      search = "",
+      role = "",
+      sortBy = "created_at",
+      sortOrder = "desc",
+    } = req.query;
+
+    if (!["admin", "staff_admin", "staff"].includes(creatorRole)) {
+      return res.status(403).json({
         success: false,
-        error: 'Internal server error' 
+        error: "Insufficient permissions to view users",
       });
     }
-  };
+
+    const roleHierarchy = {
+      admin: ["staff_admin", "staff", "parent", "student"],
+      staff_admin: ["staff", "parent", "student"],
+      staff: ["parent", "student"],
+    };
+
+    const allowedRoles = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
+    if (!allowedRoles) {
+      return res.status(403).json({
+        success: false,
+        error: "Invalid role permissions",
+      });
+    }
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
+
+    // Map each role to its table and fields
+    const roleTables: Record<string, string> = {
+      admin: "admins",
+      staff_admin: "staff_admins",
+      staff: "staffs",
+      parent: "parents",
+      student: "students",
+    };
+
+    const validSortColumns = [
+      "first_name",
+      "last_name",
+      "email",
+      "role",
+      "created_at",
+    ];
+    const sortColumn = validSortColumns.includes(sortBy as string)
+      ? (sortBy as string)
+      : "created_at";
+    const order = sortOrder === "asc";
+
+    let users: any[] = [];
+    let totalCount = 0;
+
+    for (const allowedRole of allowedRoles) {
+      if (role && role !== "all" && role !== allowedRole) {
+        continue; // skip if filtering by role
+      }
+
+      const table = roleTables[allowedRole];
+      if (!table) continue;
+
+      let query = supabase
+        .from(table)
+        .select("id, email, first_name, last_name, created_at, auth_user_id", {
+          count: "exact",
+        })
+        .neq("auth_user_id", creatorUserId); // exclude current user
+
+      if (search) {
+        query = query.or(
+          `first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`
+        );
+      }
+
+      query = query.order(sortColumn, { ascending: order });
+
+      const { data, count, error } = await query;
+      if (error) throw error;
+
+      if (data) {
+        users.push(
+          ...data.map((u: any) => ({
+            id: u.id,
+            email: u.email,
+            first_name: u.first_name,
+            last_name: u.last_name,
+            role: allowedRole,
+            created_at: u.created_at,
+          }))
+        );
+      }
+
+      if (count) {
+        totalCount += count;
+      }
+    }
+
+    // manual pagination after merging
+    const paginatedUsers = users
+      .sort((a, b) =>
+        order
+          ? a[sortColumn].localeCompare(b[sortColumn])
+          : b[sortColumn].localeCompare(a[sortColumn])
+      )
+      .slice(offset, offset + limitNum);
+
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    res.json({
+      success: true,
+      data: {
+        users: paginatedUsers,
+        pagination: {
+          currentPage: pageNum,
+          totalPages,
+          totalUsers: totalCount,
+          usersPerPage: limitNum,
+          hasNextPage: pageNum < totalPages,
+          hasPrevPage: pageNum > 1,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error in getAllUsers:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+  }
+};

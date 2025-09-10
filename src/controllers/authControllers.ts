@@ -116,7 +116,7 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
         if (studentError) throw studentError;
 
         // Create parent-student relationship if parent_id is provided
-        if (additionalData.parent_id) {
+        if (additionalData.parent_ids[0]) {
 
           // Get the student's ID from the students table
           const { data: studentData, error: studentLookupError } = await supabase
@@ -129,15 +129,16 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
             throw new Error('Student not found in students table');
           }
 
-          // Create the relationship
-          const { error: relationshipError } = await supabase
+          const relationships = additionalData.parent_ids.map((pid: number) => ({
+            parent_id: pid,
+            student_id: studentData.id
+          }));
+  
+          const { error: relError } = await supabase
             .from('parentstudentrelationship')
-            .insert({
-              parent_id: additionalData.parent_id,
-              student_id: studentData.id
-            });
-
-          if (relationshipError) throw relationshipError;
+            .insert(relationships);
+  
+          if (relError) throw relError;
         }
         break;
 
@@ -215,7 +216,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       first_name, 
       last_name, 
       role, 
-      parent_id,
+      parent_ids, // an array of parent ids
       year_group_id,
       class_id
     } = req.body;
@@ -253,32 +254,23 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     }
 
 
-    // Validate parent_id for students
-    let parentData = null;
+    // Students must have at least one parent
+    let parentDataList: any[] = [];
     if (role === 'student') {
-      if (!parent_id) {
-        return res.status(400).json({ 
-          success: false,
-          error: 'Parent ID is required for student accounts' 
-        });
+      if (!parent_ids || !Array.isArray(parent_ids) || parent_ids.length === 0) {
+        return res.status(400).json({ error: 'At least one parent ID is required for student accounts' });
       }
+ // Verify parents exist
+ const { data: fetchedParents, error: parentsError } = await supabase
+ .from('parents')
+ .select('id, email, first_name, last_name')
+ .in('id', parent_ids);
 
+if (parentsError || !fetchedParents || fetchedParents.length !== parent_ids.length) {
+ return res.status(400).json({ error: 'One or more parent IDs are invalid' });
+}
 
-      // Verify parent exists in parents table
-      const { data: fetchedParentData, error: parentError } = await supabase
-        .from('parents')
-        .select('id, email, first_name, last_name')
-        .eq('id', parent_id)
-        .single();
-
-      if (parentError || !fetchedParentData) {
-        return res.status(400).json({ 
-          success: false,
-          error: 'Invalid parent ID or parent not found' 
-        });
-      }
-      
-      parentData = fetchedParentData;
+parentDataList = fetchedParents;
     }
 
     // Check if user already exists across all role tables
@@ -328,7 +320,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
           auth_user_id: authData.user.id,
           year_group_id,
           class_id,
-          parent_id,
+          parent_ids,
           username,
         };
 
@@ -354,9 +346,9 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       let emailRecipient = emailToUse;
       let recipientName = `${first_name} ${last_name}`;
       
-      if (role === 'student' && parentData) {
-        emailRecipient = parentData.email;
-        recipientName = `${parentData.first_name} ${parentData.last_name}`;
+      if (role === 'student' && parentDataList.length > 0) {
+        emailRecipient = parentDataList[0].email;
+        recipientName = `${parentDataList[0].first_name} ${parentDataList[0].last_name}`;
       }
       
       await sendUserCreationEmail(
@@ -366,7 +358,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
         role,
         password,
         username, // Only provided for students
-        role === 'student' ? parentData : null // Pass parent data for students
+        role === 'student' ? parentDataList : null // Pass parent data for students
       );
       console.log(`Welcome email sent successfully to ${emailRecipient} ${role === 'student' ? '(parent)' : ''}`);
     } catch (emailError) {
@@ -376,8 +368,8 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Prepare response
-    const emailRecipientForMessage = role === 'student' && parentData ? parentData.email : emailToUse;
-    const emailRecipientNote = role === 'student' && parentData ? ' (sent to parent)' : '';
+    const emailRecipientForMessage = role === 'student' && parentDataList.length > 0 ? parentDataList[0].email : emailToUse;
+    const emailRecipientNote = role === 'student' && parentDataList.length > 0 ? ' (sent to parent)' : '';
     
     const responseData: any = {
       success: true,
