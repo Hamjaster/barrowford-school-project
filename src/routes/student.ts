@@ -13,6 +13,7 @@ import {
   deleteMyStudentImage,
   getStudentImagesByTeacher,
   deleteStudentImages} from '../controllers/studentImagesController.js';
+import { deleteStudentLearning, getMyLearnings, addStudentLearning } from '../controllers/studentLearningController.js';
 
 const router = Router();
 
@@ -23,6 +24,12 @@ router.get('/impacts/me', authenticateToken,checkPermission("manage_student_page
 // experiences
 router.put('/experiences', authenticateToken,checkPermission("manage_student_pages"), updateExperience as any);
 router.get('/experiences/me', authenticateToken,checkPermission("manage_student_pages"), getMyExperiences as any);
+
+
+// learnings
+router.post('/learning/', authenticateToken, checkPermission("manage_student_pages"), addStudentLearning as any);
+router.delete('/learning/:id', authenticateToken, checkPermission("manage_student_pages"), deleteStudentLearning as any);
+router.get('/learning/me', authenticateToken, checkPermission("manage_student_pages"), getMyLearnings as any);
 
 
 // images

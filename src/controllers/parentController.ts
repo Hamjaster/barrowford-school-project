@@ -16,17 +16,22 @@ export const getMyChildren = async (req: AuthenticatedRequest, res: Response) =>
 
     if (parentError || !parent) return res.status(404).json({ error: 'Parent record not found' });
 
-    // Find all children (students) linked with this parent
+    // Find all children (students) linked with this parent - only active students
     const { data: children, error: childrenError } = await supabase
       .from('parentstudentrelationship')
       .select(`
-        student:students (id, first_name, last_name, username, year_group_id, class_id, created_at)
+        student:students (id, first_name, last_name, username, year_group_id, class_id, created_at, status)
       `)
       .eq('parent_id', parent.id);
 
     if (childrenError) throw childrenError;
 
-    res.json({ success: true, data: children.map(c => c.student) });
+    // Filter out inactive students
+    const activeChildren = children
+      .map(c => c.student)
+      .filter(student => !student.status || student.status === 'active');
+
+    res.json({ success: true, data: activeChildren });
   } catch (err: any) {
     console.error('Error fetching children for parent:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -61,11 +66,19 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
     // Fetch student details
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, first_name, last_name, username, year_group_id, class_id, created_at')
+      .select('id, first_name, last_name, username, year_group_id, class_id, created_at, status')
       .eq('id', studentId)
       .single();
 
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
+
+    // Check if student is active - parents cannot view inactive students
+    if (student.status && student.status !== 'active') {
+      return res.status(403).json({ 
+        success: false,
+        error: 'This student account is inactive and cannot be viewed.' 
+      });
+    }
 
     // Fetch learnings
     const { data: learnings } = await supabase

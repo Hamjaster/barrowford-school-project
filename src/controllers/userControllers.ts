@@ -1,4 +1,4 @@
-import { AuthenticatedRequest } from "../middleware/auth.js";
+import { AuthenticatedRequest, checkPermission } from "../middleware/auth.js";
 import { Response } from "express";
 import { supabase } from "../db/supabase.js";
 
@@ -140,5 +140,30 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
       success: false,
       error: "Internal server error",
     });
+  }
+};
+
+export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { action, role, userId } = req.body; // 'activate' | 'deactivate'
+    console.log(role, userId, 'params')
+    if (!['activate', 'deactivate'].includes(action)) {
+      return res.status(400).json({ error: 'Invalid action' });
+    }
+
+
+    // Update status in correct role table
+    const table = role + (role.endsWith('s') ? '' : 's'); // crude pluralization
+    const { error } = await supabase
+      .from(table)
+      .update({ status: action === 'activate' ? 'active' : 'inactive' })
+      .eq('id', userId);
+
+    if (error) throw error;
+
+    res.json({ success: true, message: `${role} ${action}d successfully` });
+  } catch (err: any) {
+    console.error('Error toggling status:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 };

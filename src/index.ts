@@ -13,6 +13,7 @@ import personalSectionRoutes from './routes/personalSection.js';
 import studentRoutes from './routes/student.js';
 import teacherRoutes from './routes/teacher.js';
 import parentRoutes from './routes/parent.js';
+import moderationRoutes from './routes/moderation.js';
 
 
 const app = express();
@@ -78,6 +79,7 @@ app.use('/api/personalSection', personalSectionRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/parent', parentRoutes);
+app.use('/api/moderation', moderationRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

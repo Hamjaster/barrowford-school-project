@@ -182,6 +182,14 @@ export const login = async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'User profile not found' });
   }
 
+  // Check if user is active
+  if (userProfile.status && userProfile.status !== 'active') {
+    return res.status(403).json({ 
+      success: false,
+      error: 'Account is inactive. Please contact an administrator.' 
+    });
+  }
+
   const authToken = AuthUtils.generateAccessToken({
     userId: data.user?.id,
     role: userProfile.role,
