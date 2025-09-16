@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
+import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
 
 // helper: fetch student record
 const getStudentRecord = async (authUserId: string) => {
@@ -31,6 +32,14 @@ export const updateImpact = async (req: AuthenticatedRequest, res: Response) => 
 
     if (pageTypeError || !pageType) return res.status(400).json({ error: 'PageType impacts not found' });
 
+    // Get old value for audit log (check if record exists)
+    const { data: oldData, error: oldError } = await supabase
+      .from('studentpages')
+      .select('*')
+      .eq('student_id', student.id)
+      .eq('page_type_id', pageType.id)
+      .single();
+
     // upsert studentpage
     const { data, error } = await supabase
       .from('studentpages')
@@ -44,6 +53,23 @@ export const updateImpact = async (req: AuthenticatedRequest, res: Response) => 
       .single();
 
     if (error) throw error;
+
+    // Get actual user ID for audit log
+    const user = await findUserByAuthUserId(req.user.userId);
+    if (!user) throw new Error('User not found');
+
+    // Log audit - determine if it's create or update
+    const isCreate = oldError && oldError.code === 'PGRST116'; // No rows found error
+    await logAudit({
+      action: isCreate ? 'create' : 'update',
+      entityType: 'studentpages',
+      entityId: data.id,
+      oldValue: isCreate ? null : oldData,
+      newValue: data,
+      actorId: user.id,
+      actorRole: req.user.role
+    });
+
     res.json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating impact:', err);
@@ -71,6 +97,14 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
 
     if (pageTypeError || !pageType) return res.status(400).json({ error: 'PageType experiences not found' });
 
+    // Get old value for audit log (check if record exists)
+    const { data: oldData, error: oldError } = await supabase
+      .from('studentpages')
+      .select('*')
+      .eq('student_id', student.id)
+      .eq('page_type_id', pageType.id)
+      .single();
+
     // upsert studentpage
     const { data, error } = await supabase
       .from('studentpages')
@@ -84,6 +118,23 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
       .single();
 
     if (error) throw error;
+
+    // Get actual user ID for audit log
+    const user = await findUserByAuthUserId(req.user.userId);
+    if (!user) throw new Error('User not found');
+
+    // Log audit - determine if it's create or update
+    const isCreate = oldError && oldError.code === 'PGRST116'; // No rows found error
+    await logAudit({
+      action: isCreate ? 'create' : 'update',
+      entityType: 'studentpages',
+      entityId: data.id,
+      oldValue: isCreate ? null : oldData,
+      newValue: data,
+      actorId: user.id,
+      actorRole: req.user.role
+    });
+
     res.json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating experience:', err);

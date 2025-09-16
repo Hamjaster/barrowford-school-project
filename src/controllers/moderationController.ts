@@ -1,6 +1,7 @@
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { Response } from 'express';
+import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
 
 // List pending moderations (with optional filters: entity_type, student_id)
 export const listPendingModerations = async (req: AuthenticatedRequest, res: Response) => {
@@ -113,6 +114,17 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
 
         if (insertErr) throw insertErr;
         applyResult = inserted;
+
+        // Log audit for create action
+        await logAudit({
+          action: 'create',
+          entityType: 'studentimages',
+          entityId: inserted.id,
+          oldValue: null,
+          newValue: inserted,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
       } else if (mod.action_type === 'update') {
         const updatePayload = mod.new_content;
         const { data: updated, error: updateErr } = await supabase
@@ -124,6 +136,17 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
 
         if (updateErr) throw updateErr;
         applyResult = updated;
+
+        // Log audit for update action
+        await logAudit({
+          action: 'update',
+          entityType: 'studentimages',
+          entityId: mod.entity_id,
+          oldValue: mod.old_content,
+          newValue: updated,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
       } else if (mod.action_type === 'delete') {
         const { error: delErr } = await supabase
           .from('studentimages')
@@ -132,6 +155,17 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
 
         if (delErr) throw delErr;
         applyResult = { deleted: true };
+
+        // Log audit for delete action
+        await logAudit({
+          action: 'delete',
+          entityType: 'studentimages',
+          entityId: mod.entity_id,
+          oldValue: mod.old_content,
+          newValue: null,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
       }
     } else if (mod.entity_type === 'reflection') {
         // REFLECTIONS ARE NOT DEVELOPED YET
@@ -173,6 +207,17 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
           .single();
         if (insertErr) throw insertErr;
         applyResult = inserted;
+
+        // Log audit for create action
+        await logAudit({
+          action: 'create',
+          entityType: 'studentlearningentities',
+          entityId: inserted.id,
+          oldValue: null,
+          newValue: inserted,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
       } else if (mod.action_type === 'delete') {
         const { error: delErr } = await supabase
           .from('studentlearningentities')
@@ -180,6 +225,17 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
           .eq('id', mod.entity_id);
         if (delErr) throw delErr;
         applyResult = { deleted: true };
+
+        // Log audit for delete action
+        await logAudit({
+          action: 'delete',
+          entityType: 'studentlearningentities',
+          entityId: mod.entity_id,
+          oldValue: mod.old_content,
+          newValue: null,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
       }
 
     } else {

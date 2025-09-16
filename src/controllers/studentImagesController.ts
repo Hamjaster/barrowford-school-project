@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
+import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
 
 // helper: fetch student record
 const getStudentRecord = async (authUserId: string) => {
@@ -168,12 +169,36 @@ export const deleteStudentImages = async (req: AuthenticatedRequest, res: Respon
 
     const { id } = req.params;
 
+    // Get old value for audit log
+    const { data: oldData, error: oldError } = await supabase
+      .from('studentimages')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (oldError) throw oldError;
+
     const { error } = await supabase
       .from('studentimages')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
+
+    // Get actual user ID for audit log
+    const user = await findUserByAuthUserId(req.user.userId);
+    if (!user) throw new Error('User not found');
+
+    // Log audit for delete action
+    await logAudit({
+      action: 'delete',
+      entityType: 'studentimages',
+      entityId: id,
+      oldValue: oldData,
+      newValue: null,
+      actorId: user.id,
+      actorRole: req.user.role
+    });
 
     res.json({ success: true, message: `Student image with ID ${id} deleted successfully` });
   } catch (err: any) {
