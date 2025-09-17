@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-
+console.log(process.env.RESEND_API,'RESEND_API_KEY')
 const resend = new Resend(process.env.RESEND_API);
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
@@ -26,11 +26,16 @@ export const generateUserCreationEmail = (
   role: string,
   email: string,
   password: string,
-  username?: string
+  username?: string,
+  parentData?: any
 ): string => {
   const loginUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
   const fullName = `${firstName} ${lastName}`;
   const loginCredential = username || email;
+  
+  // If this is a student email being sent to parent
+  const isStudentEmailToParent = role === 'student' && parentData;
+  const recipientName = isStudentEmailToParent ? `${parentData.first_name} ${parentData.last_name}` : fullName;
   
   return `
     <!DOCTYPE html>
@@ -38,17 +43,17 @@ export const generateUserCreationEmail = (
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to Nybble Bradford School</title>
+        <title>Welcome to Barrowford School</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc;">
         <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
             <!-- Header -->
             <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
                 <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 600;">
-                    🎓 Welcome to Nybble Bradford School
+                    🎓 ${isStudentEmailToParent ? 'Student Account Created' : 'Welcome to Barrowford School'}
                 </h1>
                 <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 16px;">
-                    Your account has been created successfully!
+                    ${isStudentEmailToParent ? `A student account has been created for ${fullName}` : 'Your account has been created successfully!'}
                 </p>
             </div>
             
@@ -59,17 +64,19 @@ export const generateUserCreationEmail = (
                         <span style="color: white; font-size: 36px;">👋</span>
                     </div>
                     <h2 style="color: #1a202c; margin: 0; font-size: 24px; font-weight: 600;">
-                        Hello ${fullName}!
+                        Hello ${recipientName}!
                     </h2>
                     <p style="color: #4a5568; margin: 10px 0 0 0; font-size: 16px;">
-                        Welcome to our school community as a <strong style="color: #667eea; text-transform: capitalize;">${role}</strong>
+                        ${isStudentEmailToParent 
+                          ? `A student account has been created for your child <strong style="color: #667eea;">${fullName}</strong>` 
+                          : `Welcome to our school community as a <strong style="color: #667eea; text-transform: capitalize;">${role}</strong>`}
                     </p>
                 </div>
 
                 <!-- Credentials Box -->
                 <div style="background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); border: 2px solid #e2e8f0; border-radius: 12px; padding: 25px; margin: 30px 0;">
                     <h3 style="color: #2d3748; margin: 0 0 20px 0; font-size: 18px; font-weight: 600; text-align: center;">
-                        🔐 Your Login Credentials
+                        🔐 ${isStudentEmailToParent ? `${fullName}'s Login Credentials` : 'Your Login Credentials'}
                     </h3>
                     <div style="background: #ffffff; border-radius: 8px; padding: 20px; border: 1px solid #e2e8f0;">
                         <div style="margin-bottom: 15px;">
@@ -142,8 +149,9 @@ export const generateUserCreationEmail = (
                         </h4>
                     </div>
                     <p style="color: #234e52; margin: 0; font-size: 14px; line-height: 1.5;">
-                        As a student, you'll use your username <strong>${username}</strong> to log in. 
-                        Your parent/guardian will receive a separate notification about your account creation.
+                        ${isStudentEmailToParent 
+                          ? `Your child will use the username <strong>${username}</strong> to log in to their student account. Please keep these credentials safe and share them with your child when appropriate.`
+                          : `As a student, you'll use your username <strong>${username}</strong> to log in.`}
                     </p>
                 </div>
                 ` : ''}
@@ -154,6 +162,13 @@ export const generateUserCreationEmail = (
                         📋 What's Next?
                     </h3>
                     <ul style="color: #4a5568; font-size: 14px; line-height: 1.6; padding-left: 20px;">
+                        ${isStudentEmailToParent ? `
+                        <li style="margin-bottom: 8px;">Share the login credentials with your child</li>
+                        <li style="margin-bottom: 8px;">Help your child log in using their username: <strong>${username}</strong></li>
+                        <li style="margin-bottom: 8px;">Ensure your child changes their temporary password after first login</li>
+                        <li style="margin-bottom: 8px;">Monitor your child's learning progress through the parent portal</li>
+                        <li style="margin-bottom: 8px;">Contact school staff if you need assistance</li>
+                        ` : `
                         <li style="margin-bottom: 8px;">Click the login button above to access your account</li>
                         <li style="margin-bottom: 8px;">Change your temporary password to something secure</li>
                         <li style="margin-bottom: 8px;">Complete your profile information</li>
@@ -161,6 +176,7 @@ export const generateUserCreationEmail = (
                         ${role === 'student' ? '<li style="margin-bottom: 8px;">Start engaging with your learning materials</li>' : ''}
                         ${role === 'parent' ? '<li style="margin-bottom: 8px;">View your child\'s progress and activities</li>' : ''}
                         ${role === 'staff' ? '<li style="margin-bottom: 8px;">Access your teaching dashboard and tools</li>' : ''}
+                        `}
                     </ul>
                 </div>
             </div>
@@ -171,12 +187,12 @@ export const generateUserCreationEmail = (
                     Need help? Contact our support team or visit our help center.
                 </p>
                 <p style="color: #a0aec0; margin: 0; font-size: 12px;">
-                    This is an automated email from Nybble Bradford School Portal. 
+                    This is an automated email from Barrowford School Portal. 
                     Please do not reply to this email.
                 </p>
                 <div style="margin-top: 15px;">
                     <p style="color: #a0aec0; margin: 0; font-size: 12px;">
-                        © ${new Date().getFullYear()} Nybble Bradford School. All rights reserved.
+                        © ${new Date().getFullYear()} Barrowford School. All rights reserved.
                     </p>
                 </div>
             </div>
@@ -193,10 +209,13 @@ export const sendUserCreationEmail = async (
   lastName: string,
   role: string,
   password: string,
-  username?: string
+  username?: string,
+  parentData?: any
 ) => {
-  const subject = `🎓 Welcome to Nybble Bradford School - Your Account is Ready!`;
-  const html = generateUserCreationEmail(firstName, lastName, role, email, password, username);
+  const subject = role === 'student' && parentData 
+        ? `🎓 Student Account Created for ${firstName} ${lastName} - Barrowford School`
+    : `🎓 Welcome to Barrowford School - Your Account is Ready!`;
+  const html = generateUserCreationEmail(firstName, lastName, role, email, password, username, parentData);
   
   return await sendEmail(email, subject, html);
 };
