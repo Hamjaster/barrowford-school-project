@@ -4,6 +4,7 @@ import { AuthUtils } from '../utils/auth.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { createClient } from '@supabase/supabase-js';
 import { sendUserCreationEmail } from '../utils/resend.js';
+import dns from 'dns'
 
 // Helper function to validate role-specific user creation
 const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
@@ -170,71 +171,83 @@ export const login = async (req: Request, res: Response) => {
     });
   }
 
-  let emailToUse = email;
 
-  // If username is provided, convert it to email (for students)
-  if (username && !email) {
-    emailToUse = await findStudentEmailByUsername(username);
+  // let emailToUse = email;
+
+  // // If username is provided, convert it to email (for students)
+  // if (username && !email) {
+  //   emailToUse = await findStudentEmailByUsername(username);
     
-    if (!emailToUse) {
-      return res.status(400).json({ error: 'Invalid username or password' });
-    }
-  }
+  //   if (!emailToUse) {
+  //     return res.status(400).json({ error: 'Invalid username or password' });
+  //   }
+  // }
 
-  // Authenticate with Supabase using email
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: emailToUse!,
-    password
-  });
+  // // Authenticate with Supabase using email
+  // const { data, error } = await supabase.auth.signInWithPassword({
+  //   email: emailToUse!,
+  //   password
+  // });
   
-  if (error) {
-    console.error('Authentication error:', error);
-    return res.status(400).json({ error: 'Invalid email/username or password' });
-  }
+  // if (error) {
+  //   console.error('Authentication error:', error);
+  //   return res.status(400).json({ error: 'Invalid email/username or password' });
+  // }
 
-  console.log(data.user?.id, 'uuid');
+  // console.log(data.user?.id, 'uuid');
   
-  // Get role and profile data from app_user table
-  const { data: roleData, error: roleError } = await supabase
-    .from('app_user')
-    .select('role, first_name, last_name, dob, email')
-    .eq('auth_user_id', data.user?.id)
-    .single();
+  // // Get role and profile data from app_user table
+  // const { data: roleData, error: roleError } = await supabase
+  //   .from('app_user')
+  //   .select('role, first_name, last_name, dob, email')
+  //   .eq('auth_user_id', data.user?.id)
+  //   .single();
 
-  console.log(roleData, 'role DATA');
+  // console.log(roleData, 'role DATA');
 
-  if (roleError) {
-    console.error('Error fetching user role:', roleError);
-    return res.status(400).json({ error: 'User profile not found' });
-  }
+  // if (roleError) {
+  //   console.error('Error fetching user role:', roleError);
+  //   return res.status(400).json({ error: 'User profile not found' });
+  // }
 
-  // Generate JWT token
-  const authToken = AuthUtils.generateAccessToken({
-    userId: data.user?.id,
-    role: roleData.role,
-    email: data.user?.email
-  });
+  // // Generate JWT token
+  // const authToken = AuthUtils.generateAccessToken({
+  //   userId: data.user?.id,
+  //   role: roleData.role,
+  //   email: data.user?.email
+  // });
 
-  // Prepare response data
-  const responseData: any = {
-    access_token: authToken,
-    user: {
-      id: data.user?.id,
-      email: data.user?.email,
-      role: roleData.role,
-      first_name: roleData.first_name,
-      last_name: roleData.last_name,
-      dob: roleData.dob
-    }
-  };
+  // // Prepare response data
+  // const responseData: any = {
+  //   access_token: authToken,
+  //   user: {
+  //     id: data.user?.id,
+  //     email: data.user?.email,
+  //     role: roleData.role,
+  //     first_name: roleData.first_name,
+  //     last_name: roleData.last_name,
+  //     dob: roleData.dob
+  //   }
+  // };
 
-  // Add username for students
-  if (roleData.role === 'student') {
-    const studentUsername = AuthUtils.generateUsername(roleData.first_name, roleData.last_name);
-    responseData.user.username = studentUsername;
-  }
+  // // Add username for students
+  // if (roleData.role === 'student') {
+  //   const studentUsername = AuthUtils.generateUsername(roleData.first_name, roleData.last_name);
+  //   responseData.user.username = studentUsername;
+  // }
 
-  res.json(responseData);
+  // res.json(responseData);
+
+  //email verification 
+  const domain = email.split('@')[1];
+
+    dns.resolveMx(domain, (err, addresses) => {
+        if (err || !addresses || addresses.length === 0) {
+            return res.json({ success: false, message: 'Invalid email domain' });
+        } else {
+            return res.json({ success: true, message: 'Domain is valid and can receive emails', addresses });
+        }
+    });
 };
 
 /**

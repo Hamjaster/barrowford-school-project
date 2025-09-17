@@ -47,8 +47,8 @@ app.use(cors({
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.max,
+  windowMs: Number(config.rateLimit.windowMs) || 15 * 60 * 1000, // default to 15 minutes if not set
+  max: Number(config.rateLimit.max) || 100, // default to 100 requests per window if not set
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.',
