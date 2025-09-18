@@ -101,7 +101,7 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
         .single();
       if (modErr) throw modErr;
 
-      res.json({ success: true, message: 'Deletiong submitted for moderation', data : moderation });
+      res.json({ success: true, message: 'Deletion of Learning submitted for moderation', data : moderation });
     } catch (err: any) {
       console.error('Error deleting student learning:', err);
       res.status(500).json({ error: 'Internal server error' });
@@ -111,17 +111,19 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
 // Fetch my learnings
 export const getMyLearnings = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    if (req.user.role !== 'student') {
+    const {subject_id} = req.body
+    if (req.user.role  !== 'student') {
       return res.status(403).json({ error: 'Only students can view their learnings' });
     }
 
     const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
-
+// only return learnings for the subject_id if provided
     const { data, error } = await supabase
       .from('studentlearningentities')
       .select('id, subject_id, title, description, attachment_url, created_at')
       .eq('student_id', student.id)
+      .eq('subject_id', subject_id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;

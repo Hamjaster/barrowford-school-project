@@ -29,7 +29,7 @@ router.get('/experiences/me', authenticateToken,checkPermission("manage_student_
 // learnings
 router.post('/learning/', authenticateToken, checkPermission("manage_student_pages"), addStudentLearning as any);
 router.delete('/learning/:id', authenticateToken, checkPermission("manage_student_pages"), deleteStudentLearning as any);
-router.get('/learning/me', authenticateToken, checkPermission("manage_student_pages"), getMyLearnings as any);
+router.post('/learning/me', authenticateToken, checkPermission("manage_student_pages"), getMyLearnings as any);
 
 
 // images

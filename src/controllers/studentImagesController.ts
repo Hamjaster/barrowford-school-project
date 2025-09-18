@@ -18,7 +18,7 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
     if (req.user.role !== 'student') {
       return res.status(403).json({ error: 'Only students can upload images' });
     }
-    const { image_url } = req.body;
+    const { image_url, year_group_id } = req.body;
     if (!image_url) return res.status(400).json({ error: 'Image URL required' });
 
     // get student
@@ -29,10 +29,13 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
       .single();
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
 
+    // Use provided year_group_id or fall back to student's year_group_id
+    const targetYearGroupId = year_group_id || student.year_group_id;
+
     // create moderation - action_type = 'create'
     const newContent = {
       student_id: student.id,
-      year_group_id: student.year_group_id,
+      year_group_id: targetYearGroupId,
       image_url
     };
 
@@ -41,7 +44,7 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
       .insert({
         student_id: student.id,
         entity_type: 'studentimages',
-        year_group_id: student.year_group_id,
+        year_group_id: targetYearGroupId,
         class_id: student.class_id,
         entity_id: null,
         old_content: null,
@@ -67,16 +70,22 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
 // student gets own images
 export const getMyStudentImages = async (req: AuthenticatedRequest, res: Response) => {
   try {
-  
+    const { year_group_id } = req.query;
 
     const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('studentimages')
       .select('id, image_url, created_at')
-      .eq('student_id', student.id)
-      .order('created_at', { ascending: false });
+      .eq('student_id', student.id);
+
+    // Filter by year_group_id if provided
+    if (year_group_id) {
+      query = query.eq('year_group_id', year_group_id);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw error;
     res.json({ success: true, data });

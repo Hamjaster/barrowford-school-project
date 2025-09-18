@@ -15,8 +15,6 @@ const getStudentRecord = async (authUserId: string) => {
 // update "impacts"
 export const updateImpact = async (req: AuthenticatedRequest, res: Response) => {
   try {
- 
-
     const { content } = req.body;
     if (!content) return res.status(400).json({ error: 'Content is required' });
 
@@ -32,39 +30,63 @@ export const updateImpact = async (req: AuthenticatedRequest, res: Response) => 
 
     if (pageTypeError || !pageType) return res.status(400).json({ error: 'PageType impacts not found' });
 
-    // Get old value for audit log (check if record exists)
-    const { data: oldData, error: oldError } = await supabase
+    // Check if record exists by student_id, year_group_id, and page_type_id
+    const { data: existingRecord, error: findError } = await supabase
       .from('studentpages')
       .select('*')
       .eq('student_id', student.id)
+      .eq('year_group_id', student.year_group_id)
       .eq('page_type_id', pageType.id)
       .single();
 
-    // upsert studentpage
-    const { data, error } = await supabase
-      .from('studentpages')
-      .upsert({
-        student_id: student.id,
-        year_group_id: student.year_group_id,
-        page_type_id: pageType.id,
-        content
-      })
-      .select()
-      .single();
+    let data;
+    let isCreate = false;
 
-    if (error) throw error;
+    if (findError && findError.code === 'PGRST116') {
+      // Record doesn't exist, create new one
+      const { data: newRecord, error: createError } = await supabase
+        .from('studentpages')
+        .insert({
+          student_id: student.id,
+          year_group_id: student.year_group_id,
+          page_type_id: pageType.id,
+          content
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+      data = newRecord;
+      isCreate = true;
+    } else if (findError) {
+      // Some other error occurred
+      throw findError;
+    } else {
+      // Record exists, update it
+      const { data: updatedRecord, error: updateError } = await supabase
+        .from('studentpages')
+        .update({
+          content
+        })
+        .eq('id', existingRecord.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      data = updatedRecord;
+      isCreate = false;
+    }
 
     // Get actual user ID for audit log
     const user = await findUserByAuthUserId(req.user.userId);
     if (!user) throw new Error('User not found');
 
-    // Log audit - determine if it's create or update
-    const isCreate = oldError && oldError.code === 'PGRST116'; // No rows found error
+    // Log audit
     await logAudit({
       action: isCreate ? 'create' : 'update',
       entityType: 'studentpages',
       entityId: data.id,
-      oldValue: isCreate ? null : oldData,
+      oldValue: isCreate ? null : existingRecord,
       newValue: data,
       actorId: user.id,
       actorRole: req.user.role
@@ -80,8 +102,6 @@ export const updateImpact = async (req: AuthenticatedRequest, res: Response) => 
 // update "experiences"
 export const updateExperience = async (req: AuthenticatedRequest, res: Response) => {
   try {
-  
-
     const { content } = req.body;
     if (!content) return res.status(400).json({ error: 'Content is required' });
 
@@ -97,39 +117,63 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
 
     if (pageTypeError || !pageType) return res.status(400).json({ error: 'PageType experiences not found' });
 
-    // Get old value for audit log (check if record exists)
-    const { data: oldData, error: oldError } = await supabase
+    // Check if record exists by student_id, year_group_id, and page_type_id
+    const { data: existingRecord, error: findError } = await supabase
       .from('studentpages')
       .select('*')
       .eq('student_id', student.id)
+      .eq('year_group_id', student.year_group_id)
       .eq('page_type_id', pageType.id)
       .single();
 
-    // upsert studentpage
-    const { data, error } = await supabase
-      .from('studentpages')
-      .upsert({
-        student_id: student.id,
-        year_group_id: student.year_group_id,
-        page_type_id: pageType.id,
-        content
-      })
-      .select()
-      .single();
+    let data;
+    let isCreate = false;
 
-    if (error) throw error;
+    if (findError && findError.code === 'PGRST116') {
+      // Record doesn't exist, create new one
+      const { data: newRecord, error: createError } = await supabase
+        .from('studentpages')
+        .insert({
+          student_id: student.id,
+          year_group_id: student.year_group_id,
+          page_type_id: pageType.id,
+          content
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+      data = newRecord;
+      isCreate = true;
+    } else if (findError) {
+      // Some other error occurred
+      throw findError;
+    } else {
+      // Record exists, update it
+      const { data: updatedRecord, error: updateError } = await supabase
+        .from('studentpages')
+        .update({
+          content
+        })
+        .eq('id', existingRecord.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+      data = updatedRecord;
+      isCreate = false;
+    }
 
     // Get actual user ID for audit log
     const user = await findUserByAuthUserId(req.user.userId);
     if (!user) throw new Error('User not found');
 
-    // Log audit - determine if it's create or update
-    const isCreate = oldError && oldError.code === 'PGRST116'; // No rows found error
+    // Log audit
     await logAudit({
       action: isCreate ? 'create' : 'update',
       entityType: 'studentpages',
       entityId: data.id,
-      oldValue: isCreate ? null : oldData,
+      oldValue: isCreate ? null : existingRecord,
       newValue: data,
       actorId: user.id,
       actorRole: req.user.role
@@ -145,27 +189,28 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
 // fetch my impacts
 export const getMyImpacts = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    console.log(req.user, "USER")
     const { data: student } = await getStudentRecord(req.user.userId);
     if (!student) return res.status(404).json({ error: 'Student not found' });
-  // find page_type_id for experiences
-  const { data: pageType, error: pageTypeError } = await supabase
-  .from('pagetypes')
-  .select('id')
-  .eq('name', 'impacts')
-  .single();
+    
+    // find page_type_id for impacts
+    const { data: pageType, error: pageTypeError } = await supabase
+      .from('pagetypes')
+      .select('id')
+      .eq('name', 'impacts')
+      .single();
 
-if (pageTypeError || !pageType) return res.status(400).json({ error: 'PageType Impacts not found' });
+    if (pageTypeError || !pageType) return res.status(400).json({ error: 'PageType Impacts not found' });
 
     const { data, error } = await supabase
       .from('studentpages')
       .select('id, content, created_at')
       .eq('student_id', student.id)
+      .eq('year_group_id', student.year_group_id)
       .eq('page_type_id', pageType.id)
       .single();
 
     if (error && error.code !== 'PGRST116') throw error; // ignore "no rows found"
-    res.json({ success: true, data : data ? data : "" });
+    res.json({ success: true, data: data ? data : "" });
   } catch (err: any) {
     console.error('Error fetching impacts:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -175,27 +220,28 @@ if (pageTypeError || !pageType) return res.status(400).json({ error: 'PageType I
 // fetch my experiences
 export const getMyExperiences = async (req: AuthenticatedRequest, res: Response) => {
   try {
-   
     const { data: student } = await getStudentRecord(req.user.userId);
     if (!student) return res.status(404).json({ error: 'Student not found' });
-  // find page_type_id for experiences
-  const { data: pageType, error: pageTypeError } = await supabase
-  .from('pagetypes')
-  .select('id')
-  .eq('name', 'experiences')
-  .single();
+    
+    // find page_type_id for experiences
+    const { data: pageType, error: pageTypeError } = await supabase
+      .from('pagetypes')
+      .select('id')
+      .eq('name', 'experiences')
+      .single();
 
-if (pageTypeError || !pageType) return res.status(400).json({ error: 'PageType experiences not found' });
+    if (pageTypeError || !pageType) return res.status(400).json({ error: 'PageType experiences not found' });
 
     const { data, error } = await supabase
       .from('studentpages')
       .select('id, content, created_at')
       .eq('student_id', student.id)
+      .eq('year_group_id', student.year_group_id)
       .eq('page_type_id', pageType.id)
       .single();
 
     if (error && error.code !== 'PGRST116') throw error;
-    res.json({ success: true, data :data ? data : ""  });
+    res.json({ success: true, data: data ? data : "" });
   } catch (err: any) {
     console.error('Error fetching experiences:', err);
     res.status(500).json({ error: 'Internal server error' });

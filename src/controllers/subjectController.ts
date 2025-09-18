@@ -142,7 +142,6 @@ export const getAllSubjects = async (req: Request, res: Response) => {
   }
 };
 
-
 // Activate subject
 export const toggleSubjectStatus = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -189,6 +188,57 @@ const {status} = req.body;
     res.json({ success: true, message: 'Subject status toggled successfully', data });
   } catch (err: any) {
     console.error('Error toggling subject status:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get all year groups
+export const getAllYearGroups = async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('yeargroups')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err: any) {
+    console.error('Error fetching year groups:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get all subjects under a specific year group
+export const getSubjectsByYearGroup = async (req: Request, res: Response) => {
+  try {
+    const { yearGroupId } = req.params;
+
+    if (!yearGroupId) {
+      return res.status(400).json({ error: 'Year group ID is required' });
+    }
+
+    const { data, error } = await supabase
+      .from('year_group_subject')
+      .select(`
+        subjects (
+          id,
+          name,
+          status,
+          created_at
+        )
+      `)
+      .eq('year_group_id', yearGroupId);
+
+    if (error) throw error;
+
+    // Extract subjects from the joined data and filter only active subjects
+    const subjects = data
+      .map((item: any) => item.subjects)
+      .filter((subject: any) => subject != null && subject.status === 'active');
+
+    res.json({ success: true, data: subjects });
+  } catch (err: any) {
+    console.error('Error fetching subjects by year group:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
