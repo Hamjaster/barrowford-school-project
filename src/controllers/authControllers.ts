@@ -4,7 +4,6 @@ import { AuthUtils } from '../utils/auth.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { createClient } from '@supabase/supabase-js';
 import { sendUserCreationEmail } from '../utils/resend.js';
-import dns from 'dns'
 
 // Helper function to validate role-specific user creation
 const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
@@ -162,6 +161,7 @@ export const login = async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Email/username and password are required' });
   }
 
+  let emailToUse = email;
 
   if (username && !email) {
     // Only students use username
