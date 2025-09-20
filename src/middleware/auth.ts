@@ -31,7 +31,8 @@ const permissions = {
     "manage_users",
     "get_users",
     "manage_student_images",
-    "get_assigned_students"
+    "get_assigned_students",
+    "moderate_content"
   ],
   parent: [
     "view_children"
@@ -84,8 +85,24 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 
     const decoded = AuthUtils.verifyAccessToken(token);
     
-    // Note: You can add user existence/active status check here if needed
-    // For now, we trust the JWT token validation
+    // Check if user exists and is active
+    const userProfile = await AuthUtils.findUserByAuthUserId(decoded.userId);
+    if (!userProfile) {
+      res.status(404).json({ 
+        success: false, 
+        message: 'User profile not found' 
+      });
+      return;
+    }
+
+    // Check if user is active
+    if (userProfile.status && userProfile.status !== 'active') {
+      res.status(403).json({ 
+        success: false, 
+        message: 'Account is inactive. Please contact an administrator.' 
+      });
+      return;
+    }
 
     req.user = decoded;
     next();

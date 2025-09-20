@@ -4,78 +4,56 @@ import { AuthUtils } from '../utils/auth.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { createClient } from '@supabase/supabase-js';
 import { sendUserCreationEmail } from '../utils/resend.js';
+import { canManageRole, getRoleTable, isValidRole, UserRole } from '../utils/roleUtils.js';
+import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
 
 // Helper function to validate role-specific user creation
 const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
-  const roleHierarchy = {
-    admin: ['staff_admin', 'staff', 'parent', 'student'],
-    staff_admin: ['staff', 'parent', 'student'],
-    staff: ['parent', 'student']
-  };
-
-  const allowedRoles = roleHierarchy[creatorRole as keyof typeof roleHierarchy];
-  
-  if (!allowedRoles || !allowedRoles.includes(targetRole)) {
-    return {
-      allowed: false,
-      message: `${creatorRole} cannot create ${targetRole} accounts`
-    };
-  }
-
-  return { allowed: true, message: '' };
+  return canManageRole(creatorRole as UserRole, targetRole as UserRole);
 };
 
 // Helper function to validate password reset permissions
 const canResetSpecificUserPassword = (creatorRole: string, targetRole: string) => {
-  const resetPermissions = {
-    admin: ['staff_admin', 'staff', 'parent', 'student'],
-    staff_admin: ['staff', 'parent', 'student'],
-    staff: ['parent', 'student']
-  };
-
-  const allowedRoles = resetPermissions[creatorRole as keyof typeof resetPermissions];
-  
-  if (!allowedRoles || !allowedRoles.includes(targetRole)) {
-    return {
-      allowed: false,
-      message: `${creatorRole} cannot reset password for ${targetRole} accounts`
-    };
-  }
-
-  return { allowed: true, message: '' };
+  return canManageRole(creatorRole as UserRole, targetRole as UserRole);
 };
 
 // Helper function to create role-specific table entries
 const createRoleSpecificEntry = async (role: string, additionalData: any = {}) => {
   try {
+    const table = getRoleTable(role as UserRole);
+    
     switch (role) {
       case 'admin':
-        const { error: adminError } = await supabase
-          .from('admins')
+        const { data: adminData, error: adminError } = await supabase
+          .from(table)
           .insert({
             auth_user_id: additionalData.auth_user_id,
             first_name: additionalData.first_name,
             last_name: additionalData.last_name,
             email: additionalData.email,
             
-          });
+          })
+          .select()
+          .single();
         if (adminError) throw adminError;
-        break;
+        return adminData;
 
       case 'staff_admin':
-        const { error: staffAdminError } = await supabase
-        .from('staff_admins')
+        const { data: staffAdminData, error: staffAdminError } = await supabase
+        .from(table)
         .insert({
           auth_user_id: additionalData.auth_user_id,
           first_name: additionalData.first_name,
           last_name: additionalData.last_name,
           email: additionalData.email,
-        });
+        })
+        .select()
+        .single();
       if (staffAdminError) throw staffAdminError;
-      break;
+      return staffAdminData;
       case 'staff':
-        const { error: teacherError } = await supabase
-          .from('staffs')
+        const { data: staffData, error: teacherError } = await supabase
+          .from(table)
           .insert({
             auth_user_id: additionalData.auth_user_id,
             year_group_id: additionalData.year_group_id || null,
@@ -83,27 +61,31 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
             email: additionalData.email,
             first_name: additionalData.first_name,
             last_name: additionalData.last_name,
-          });
+          })
+          .select()
+          .single();
         if (teacherError) throw teacherError;
-        break;
+        return staffData;
 
       case 'parent':
         const { error: parentError, data: parentData } = await supabase
-          .from('parents')
+          .from(table)
           .insert({
             auth_user_id: additionalData.auth_user_id,
             first_name: additionalData.first_name,
             last_name: additionalData.last_name,
             email: additionalData.email,
-          });
+          })
+          .select()
+          .single();
           console.log("Parent error", parentError);
           console.log("Parent data", parentData);
         if (parentError) throw parentError;
-        break;
+        return parentData;
 
       case 'student':
-        const { error: studentError } = await supabase
-          .from('students')
+        const { data: studentData, error: studentError } = await supabase
+          .from(table)
           .insert({
             auth_user_id: additionalData.auth_user_id,
             year_group_id: additionalData.year_group_id || null,
@@ -112,23 +94,13 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
             email: additionalData.email,
             first_name: additionalData.first_name,
             last_name: additionalData.last_name,
-          });
+          })
+          .select()
+          .single();
         if (studentError) throw studentError;
 
         // Create parent-student relationship if parent_id is provided
         if (additionalData.parent_ids[0]) {
-
-          // Get the student's ID from the students table
-          const { data: studentData, error: studentLookupError } = await supabase
-            .from('students')
-            .select('id')
-            .eq('auth_user_id', additionalData.auth_user_id)
-            .single();
-
-          if (studentLookupError || !studentData) {
-            throw new Error('Student not found in students table');
-          }
-
           const relationships = additionalData.parent_ids.map((pid: number) => ({
             parent_id: pid,
             student_id: studentData.id
@@ -140,7 +112,7 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
   
           if (relError) throw relError;
         }
-        break;
+        return studentData;
 
       default:
         // No additional table entry needed for other roles
@@ -182,6 +154,14 @@ export const login = async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'User profile not found' });
   }
 
+  // Check if user is active
+  if (userProfile.status && userProfile.status !== 'active') {
+    return res.status(403).json({ 
+      success: false,
+      error: 'Account is inactive. Please contact an administrator.' 
+    });
+  }
+
   const authToken = AuthUtils.generateAccessToken({
     userId: data.user?.id,
     role: userProfile.role,
@@ -197,7 +177,8 @@ export const login = async (req: Request, res: Response) => {
       first_name: userProfile.first_name,
       last_name: userProfile.last_name,
       dob: userProfile.dob
-    }
+    }, 
+    session: data.session
   };
 
   if (userProfile.role === 'student') {
@@ -230,7 +211,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
 
     
     // Validate role
-    if (!['admin', 'staff_admin', 'staff', 'parent', 'student'].includes(role)) {
+    if (!isValidRole(role)) {
       return res.status(400).json({ 
         success: false,
         error: 'Invalid role' 
@@ -328,6 +309,21 @@ parentDataList = fetchedParents;
 
         const createdUser = await createRoleSpecificEntry( role, userData);
         console.log(`${role} entry created successfully`, createdUser);
+
+        // Get actual user ID for audit log
+        const user = await findUserByAuthUserId(req.user.userId);
+        if (!user) throw new Error('User not found');
+
+        // Log audit for user creation
+        await logAudit({
+          action: 'create',
+          entityType: getRoleTable(role as UserRole),
+          entityId: createdUser.id,
+          oldValue: null,
+          newValue: createdUser,
+          actorId: user.id,
+          actorRole: req.user.role
+        });
 
       } catch (roleError) {
         console.error(`Failed to create ${role} entry:`, roleError);

@@ -10,9 +10,11 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
 import personalSectionRoutes from './routes/personalSection.js';
+import subjectRoutes from './routes/subject.js';
 import studentRoutes from './routes/student.js';
 import teacherRoutes from './routes/teacher.js';
 import parentRoutes from './routes/parent.js';
+import moderationRoutes from './routes/moderation.js';
 
 
 const app = express();
@@ -25,6 +27,7 @@ const allowedOrigins = [
   config.frontendUrl,
   'http://localhost:3000',
   'http://localhost:5173',
+  'http://localhost:4173',
   // TODO: fix this laterr
   'https://nybble-bradford-school-frontend.vercel.app'
 ];
@@ -75,9 +78,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/personalSection', personalSectionRoutes);
+app.use('/api/subject', subjectRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/teacher', teacherRoutes);
 app.use('/api/parent', parentRoutes);
+app.use('/api/moderation', moderationRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
