@@ -177,7 +177,8 @@ export const login = async (req: Request, res: Response) => {
       first_name: userProfile.first_name,
       last_name: userProfile.last_name,
       dob: userProfile.dob
-    }
+    }, 
+    session: data.session
   };
 
   if (userProfile.role === 'student') {
