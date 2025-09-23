@@ -31,15 +31,30 @@ const permissions = {
     "manage_users",
     "get_users",
     "manage_student_images",
-    "get_assigned_students"
+    "get_assigned_students",
+    "create-reflection-topic",
+    "all-reflections",
+    "update-reflections",
+    "delete-reflections",
+    "add-comments",
+    "fetch-comments"
+
   ],
   parent: [
-    "view_children"
+    "view_children",
+    "add-comments",
+    "fetch-reflection-id",
+    "fetch-comments"
   ],
   student: [
     "manage_personal_section",
     "manage_student_pages",
-    "manage_own_images"
+    "manage_own_images",
+    "get-active-topics",
+    "create-reflection",
+    "fetch-my-reflections",
+    "fetch-comments"
+
   ]
 };
 
