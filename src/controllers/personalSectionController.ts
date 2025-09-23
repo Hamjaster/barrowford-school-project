@@ -2,6 +2,13 @@ import { Request, Response } from 'express';
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
+const getStudentRecord = async (authUserId: string) => {
+  return await supabase
+    .from('students')
+    .select('*')
+    .eq('auth_user_id', authUserId)
+    .single();
+};
 
 // FOR MANAGERS (admin, staff, staff_admin)
 export const createPersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
@@ -328,6 +335,44 @@ export const getMyPersonalSections = async (req: AuthenticatedRequest, res: Resp
     res.json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching personal sections:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get my personal section for a specific topic
+export const getMyPersonalSectionByTopic = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { topicId } = req.params;
+
+    if (!topicId) {
+      return res.status(400).json({ error: 'Topic ID is required' });
+    }
+
+    // Find student record
+    const {data : student} = await getStudentRecord(req.user.userId);
+    if (!student) {
+      return res.status(404).json({ error: 'Student record not found' });
+    }
+
+    // Fetch student's personal section for this topic
+    console.log(student, topicId, 'TOPICS', 'student')
+    const { data, error } = await supabase
+      .from('personalsections')
+      .select(`
+        id,
+        content,
+        created_at,
+        topic:personalsectiontopics (id, title)
+      `)
+      .eq('student_id', student.id)
+      .eq('topic_id', topicId)
+      .maybeSingle(); // maybeSingle: returns null if no match, avoids throwing error
+
+    if (error) throw error;
+
+    res.json({ success: true, data });
+  } catch (err: any) {
+    console.error('Error fetching personal section by topic:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 };

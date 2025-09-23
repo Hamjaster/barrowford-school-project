@@ -6,6 +6,7 @@ import {
   deletePersonalSectionTopic,
   getAllPersonalSectionTopics,
   togglePersonalSectionTopicStatus,
+  getMyPersonalSectionByTopic,
 } from '../controllers/personalSectionController.js';
 import { createPersonalSection, getMyPersonalSections, updatePersonalSection } from '../controllers/personalSectionController.js';
 
@@ -22,6 +23,7 @@ router.get('/topics', authenticateToken, getAllPersonalSectionTopics as any);
 router.post('/', authenticateToken,checkPermission('manage_personal_section'), createPersonalSection as any);
 router.put('/:id', authenticateToken,checkPermission('manage_personal_section'), updatePersonalSection as any);
 router.get('/me', authenticateToken,checkPermission('manage_personal_section'), getMyPersonalSections as any);
+router.get('/me/:topicId', authenticateToken,checkPermission('manage_personal_section'), getMyPersonalSectionByTopic as any);
 
 
 export default router;
