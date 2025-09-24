@@ -306,6 +306,88 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+export const getStudentPersonalSections = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { studentId } = req.params;
+
+    if (!studentId) {
+      return res.status(400).json({ error: 'Student ID is required' });
+    }
+
+    // Verify the student exists
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, first_name, last_name')
+      .eq('id', studentId)
+      .single();
+
+    if (studentError || !student) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    // Get the student's personal sections
+    const { data, error } = await supabase
+      .from('personalsections')
+      .select(`
+        id,
+        content,
+        created_at,
+        topic:personalsectiontopics (id, title)
+      `)
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ success: true, data });
+  } catch (err: any) {
+    console.error('Error fetching student personal sections:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+export const updatePersonalSectionByTeacher = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+
+    if (!content) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+
+    // Verify the personal section exists
+    const { data: existingSection, error: existingError } = await supabase
+      .from('personalsections')
+      .select('id, student_id, content')
+      .eq('id', id)
+      .single();
+
+    if (existingError || !existingSection) {
+      return res.status(404).json({ error: 'Personal section not found' });
+    }
+
+    // Update the personal section content
+    const { data, error } = await supabase
+      .from('personalsections')
+      .update({ content})
+      .eq('id', id)
+      .select(`
+        id,
+        content,
+        created_at,
+        topic:personalsectiontopics (id, title)
+      `)
+      .single();
+
+    if (error) throw error;
+
+    res.json({ success: true, data });
+  } catch (err: any) {
+    console.error('Error updating personal section:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 export const getMyPersonalSections = async (req: AuthenticatedRequest, res: Response) => {
   try {
  

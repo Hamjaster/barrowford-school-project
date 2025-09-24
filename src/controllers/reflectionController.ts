@@ -38,6 +38,120 @@ export const createReflectioTopic = async (req:AuthenticatedRequest,res : Respon
     }
 }
 
+export const fetchAllTopics = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        // Fetch all reflection topics
+        const { data, error } = await supabase
+            .from("reflectiontopics")
+            .select("*")
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        res.status(200).json({ success: true, data });
+    } catch (error: any) {
+        console.error('Error fetching topics:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+export const updateTopic = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { title, is_active } = req.body;
+
+        if (!id) {
+            return res.status(400).json({ error: 'Topic ID is required' });
+        }
+
+        // Validate input
+        if (!title && is_active === undefined) {
+            return res.status(400).json({ error: 'At least title or is_active must be provided' });
+        }
+
+        // Prepare update object
+        const updateData: any = {};
+        if (title) updateData.title = title;
+        if (is_active !== undefined) updateData.is_active = is_active;
+
+        // Update the topic
+        const { data, error } = await supabase
+            .from("reflectiontopics")
+            .update(updateData)
+            .eq("id", id)
+            .select()
+            .single();
+
+        if (error) {
+            if (error.code === 'PGRST116') {
+                return res.status(404).json({ error: 'Topic not found' });
+            }
+            throw error;
+        }
+
+        res.status(200).json({ success: true, data });
+    } catch (error: any) {
+        console.error('Error updating topic:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
+export const deleteTopic = async (req: AuthenticatedRequest, res: Response) => {
+    try {
+        const { id } = req.params;
+
+        if (!id) {
+            return res.status(400).json({ error: 'Topic ID is required' });
+        }
+
+        // Check if topic exists and get info before deletion
+        const { data: existingTopic, error: fetchError } = await supabase
+            .from("reflectiontopics")
+            .select("id, title")
+            .eq("id", id)
+            .single();
+
+        if (fetchError) {
+            if (fetchError.code === 'PGRST116') {
+                return res.status(404).json({ error: 'Topic not found' });
+            }
+            throw fetchError;
+        }
+
+        // Check if there are any reflections using this topic
+        const { data: reflections, error: reflectionError } = await supabase
+            .from("reflections")
+            .select("id")
+            .eq("topic_id", id)
+            .limit(1);
+
+        if (reflectionError) throw reflectionError;
+
+        if (reflections && reflections.length > 0) {
+            return res.status(400).json({ 
+                error: 'Cannot delete topic with existing reflections. Please remove all reflections first.' 
+            });
+        }
+
+        // Delete the topic
+        const { error: deleteError } = await supabase
+            .from("reflectiontopics")
+            .delete()
+            .eq("id", id);
+
+        if (deleteError) throw deleteError;
+
+        res.status(200).json({ 
+            success: true, 
+            message: `Topic "${existingTopic.title}" deleted successfully`,
+            deletedTopicId: id
+        });
+    } catch (error: any) {
+        console.error('Error deleting topic:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+}
+
 export const fetchActiveTopics = async (req: AuthenticatedRequest, res: Response) => {
   try {
     // 1. Get student ID from auth_user_id
@@ -174,7 +288,7 @@ export const fetchAllReflectionsWithTitle = async (req: AuthenticatedRequest, re
 // Admin/Teacher fetch reflections of a student by ID
 export const fetchReflectionsByStudentId = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { studentId } = req.query; 
+    const { studentId } = req.params; 
     if (!studentId) {
       return res.status(400).json({ error: "student id is required" });
     }
@@ -189,8 +303,10 @@ export const fetchReflectionsByStudentId = async (req: AuthenticatedRequest, res
       created_at,
       topic_id,
       status,
-      reflectiontopics!inner(title)
+      reflectiontopics!inner(title),
+      reflectioncomments!inner(id,comment,created_at,user_role)
     `)
+    .eq("student_id", studentId)
     .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -364,7 +480,7 @@ export const addComment = async(req:AuthenticatedRequest,res:Response)=>{
   const {reflectionId,content} = req.body;
   try{
 
-  if(!reflectionId) return res.status(400).json({error :"Reflecion is requird"})
+  if(!reflectionId) return res.status(400).json({error :"Reflection is requird"})
   if(!content) return res.status(400).json({error : 'Comment is Required'})
 
   // Fetch user id using auth_user_id (UUID from Supabase Auth)
@@ -374,22 +490,22 @@ export const addComment = async(req:AuthenticatedRequest,res:Response)=>{
     ]);
 
     let user_id: number | null = null;
-   
+    let user_role: string | null = null;
 
     if (staffRes.data) {
       user_id = staffRes.data.id;
-     
+      user_role = "Teacher";
     } else if (parentRes.data) {
       user_id = parentRes.data.id;
-     
+      user_role = "Parent";
     } else {
       return res.status(404).json({ error: "User not found" });
     }
 
     const { data , error } = await supabase
     .from("reflectioncomments")
-    .insert({reflection_id:reflectionId,user_id:user_id,comment:content})
-    .select('id,created_at,comment')
+    .insert({reflection_id:reflectionId,user_id:user_id,comment:content, user_role:user_role})
+    .select('id,created_at,comment, user_role')
     .single()
 
     if(error) throw error;
@@ -406,7 +522,7 @@ export const addComment = async(req:AuthenticatedRequest,res:Response)=>{
 // ✅ Fetch all comments for a reflection
 export const fetchComments = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { reflectionId } = req.query;
+    const { reflectionId } = req.params;
 
     if (!reflectionId) {
       return res.status(400).json({ error: "Reflection ID is required" });
@@ -421,39 +537,8 @@ export const fetchComments = async (req: AuthenticatedRequest, res: Response) =>
       .order("created_at", { ascending: false });
 
     if (error) throw error;
-    // Fetch role for each comment
-    const commentsWithRole = await Promise.all(
-      data.map(async (comment) => {
-        let role = null;
-
-        // Check if user exists in staff table
-        const { data: staffData } = await supabase
-          .from("staffs")
-          .select("id")
-          .eq("id", comment.user_id)
-          .single();
-
-        if (staffData) role = "Teacher";
-
-        // If not in staff, check parent table
-        if (!role) {
-          const { data: parentData } = await supabase
-            .from("parents")
-            .select("id")
-            .eq("id", comment.user_id)
-            .single();
-
-          if (parentData) role = "Parent";
-        }
-
-        return {
-          ...comment,
-          user_role: role || "unknown", // fallback role
-        };
-      })
-    );
-
-    res.status(200).json({ success: true, data: commentsWithRole });
+    
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error("Error fetching comments:", err);
     res.status(500).json({ error: "Internal server error" });

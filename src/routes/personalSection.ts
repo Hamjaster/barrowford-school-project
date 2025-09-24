@@ -7,6 +7,8 @@ import {
   getAllPersonalSectionTopics,
   togglePersonalSectionTopicStatus,
   getMyPersonalSectionByTopic,
+  getStudentPersonalSections,
+  updatePersonalSectionByTeacher,
 } from '../controllers/personalSectionController.js';
 import { createPersonalSection, getMyPersonalSections, updatePersonalSection } from '../controllers/personalSectionController.js';
 
@@ -24,6 +26,10 @@ router.post('/', authenticateToken,checkPermission('manage_personal_section'), c
 router.put('/:id', authenticateToken,checkPermission('manage_personal_section'), updatePersonalSection as any);
 router.get('/me', authenticateToken,checkPermission('manage_personal_section'), getMyPersonalSections as any);
 router.get('/me/:topicId', authenticateToken,checkPermission('manage_personal_section'), getMyPersonalSectionByTopic as any);
+
+// Teacher routes for managing student personal sections
+router.get('/student/:studentId', authenticateToken, checkPermission('get_assigned_students'), getStudentPersonalSections as any);
+router.put('/teacher/:id', authenticateToken, checkPermission('get_assigned_students'), updatePersonalSectionByTeacher as any);
 
 
 export default router;
