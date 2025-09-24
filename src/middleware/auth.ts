@@ -33,17 +33,21 @@ const permissions = {
     "manage_student_images",
     "get_assigned_students",
     "create-reflection-topic",
+    "fetch-all-topics",
+    "update-reflection-topic",
+    "delete-reflection-topic",
     "all-reflections",
     "update-reflections",
     "delete-reflections",
     "add-comments",
     "fetch-comments",
-     "moderate_content"
+     "moderate_content",
+     "get-student-reflections"
   ],
   parent: [
     "view_children",
     "add-comments",
-    "fetch-reflection-id",
+    "get-student-reflections",
     "fetch-comments"
   ],
   student: [
