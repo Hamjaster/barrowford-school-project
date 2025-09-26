@@ -32,6 +32,17 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
     // Use provided year_group_id or fall back to student's year_group_id
     const targetYearGroupId = year_group_id || student.year_group_id;
 
+    // Fetch year group name for entity_title
+    const { data: yearGroup, error: yearGroupError } = await supabase
+      .from('yeargroups')
+      .select('name')
+      .eq('id', targetYearGroupId)
+      .single();
+
+    if (yearGroupError || !yearGroup) {
+      return res.status(404).json({ error: 'Year group not found' });
+    }
+
     // create moderation - action_type = 'create'
     const newContent = {
       student_id: student.id,
@@ -47,6 +58,7 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
         year_group_id: targetYearGroupId,
         class_id: student.class_id,
         entity_id: null,
+        entity_title: `My Images (${yearGroup.name})`,
         old_content: null,
         new_content: newContent,
         new_attachment: image_url,
@@ -119,6 +131,17 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
 
     if (imageErr || !imageRow) return res.status(404).json({ error: 'Image not found' });
 
+    // Fetch year group name for entity_title
+    const { data: yearGroup, error: yearGroupError } = await supabase
+      .from('yeargroups')
+      .select('name')
+      .eq('id', imageRow.year_group_id)
+      .single();
+
+    if (yearGroupError || !yearGroup) {
+      return res.status(404).json({ error: 'Year group not found' });
+    }
+
     // create moderation (delete)
     const { data: moderation, error: modErr } = await supabase
       .from('moderations')
@@ -128,6 +151,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
         class_id: studentRow.class_id,
         entity_type: 'studentimages',
         entity_id: id,
+        entity_title: `My Images (${yearGroup.name})`,
         old_content: imageRow,
         old_attachment: imageRow.image_url,
         new_content: null,

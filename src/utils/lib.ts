@@ -67,4 +67,49 @@ export const findUserByAuthUserId = async (authUserId: string) => {
 
     console.log('auditlog created', data, error);
   };
+
+/**
+ * Calculate the academic week number based on the current date
+ * Academic year starts from the first full week of September
+ * A full week starts on Monday and the first full week is the first Monday-Sunday period in September
+ * @param date - Optional date to calculate from, defaults to current date
+ * @returns String in format "Week X" where X is the week number
+ */
+export const calculateAcademicWeek = (date?: Date): string => {
+  const currentDate = date || new Date();
+  const currentYear = currentDate.getFullYear();
+  
+  // Determine which academic year we're in
+  let academicYear = currentYear;
+  if (currentDate.getMonth() < 8) { // Before September
+    academicYear = currentYear - 1;
+  }
+  
+  // Find the first Monday of September for the academic year
+  const septemberFirst = new Date(academicYear, 8, 1); // September 1st
+  const dayOfWeek = septemberFirst.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  
+  // Calculate days to add to get to the first Monday
+  // If September 1st is Monday (1), add 0 days
+  // If September 1st is Tuesday (2), add 6 days (to next Monday)
+  // If September 1st is Sunday (0), add 1 day
+  const daysToFirstMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : (8 - dayOfWeek);
+  
+  const firstMondayOfSeptember = new Date(septemberFirst);
+  firstMondayOfSeptember.setDate(septemberFirst.getDate() + daysToFirstMonday);
+  
+  // Calculate the difference in milliseconds
+  const timeDifference = currentDate.getTime() - firstMondayOfSeptember.getTime();
+  
+  // Convert to days and then to weeks
+  const daysDifference = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+  const weekNumber = Math.floor(daysDifference / 7) + 1;
+  
+  // Ensure we don't return negative week numbers or zero
+  if (weekNumber < 1) {
+    return "Week 1";
+  }
+  
+  return `Week ${weekNumber}`;
+};
   

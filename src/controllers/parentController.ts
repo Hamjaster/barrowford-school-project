@@ -92,10 +92,10 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
       .select('id, image_url, created_at')
       .eq('student_id', studentId);
 
-    // Fetch reflections
+    // Fetch reflections, also include the topic title and comments
     const { data: reflections } = await supabase
       .from('reflections')
-      .select('id, topic_id, content, attachment_url, status, created_at')
+      .select('*')
       .eq('student_id', studentId);
 
     res.json({
