@@ -9,6 +9,13 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 // Import routes
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
+import personalSectionRoutes from './routes/personalSection.js';
+import subjectRoutes from './routes/subject.js';
+import studentRoutes from './routes/student.js';
+import teacherRoutes from './routes/teacher.js';
+import parentRoutes from './routes/parent.js';
+import reflectionRouter from './routes/reflection.js'
+import moderationRoutes from './routes/moderation.js';
 
 
 const app = express();
@@ -21,6 +28,7 @@ const allowedOrigins = [
   config.frontendUrl,
   'http://localhost:3000',
   'http://localhost:5173',
+  'http://localhost:4173',
   // TODO: fix this laterr
   'https://nybble-bradford-school-frontend.vercel.app'
 ];
@@ -47,8 +55,8 @@ app.use(cors({
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.max,
+  windowMs: Number(config.rateLimit.windowMs) || 15 * 60 * 1000, // default to 15 minutes if not set
+  max: Number(config.rateLimit.max) || 100, // default to 100 requests per window if not set
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.',
@@ -70,6 +78,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/personalSection', personalSectionRoutes);
+app.use('/api/subject', subjectRoutes);
+app.use('/api/student', studentRoutes);
+app.use('/api/teacher', teacherRoutes);
+app.use('/api/parent', parentRoutes);
+app.use('/api/reflection',reflectionRouter)
+app.use('/api/moderation', moderationRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

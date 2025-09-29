@@ -19,21 +19,46 @@ const permissions = {
   admin: [
     "manage_users",
     "get_users",
+    "manage_student_images"
 
   ],
   staff_admin: [
     "manage_users",
     "get_users",
+    "manage_student_images"
   ],
   staff: [
     "manage_users",
     "get_users",
+    "manage_student_images",
+    "get_assigned_students",
+    "create-reflection-topic",
+    "fetch-all-topics",
+    "update-reflection-topic",
+    "delete-reflection-topic",
+    "all-reflections",
+    "update-reflections",
+    "delete-reflections",
+    "add-comments",
+    "fetch-comments",
+     "moderate_content",
+     "get-student-reflections"
   ],
   parent: [
-
+    "view_children",
+    "add-comments",
+    "get-student-reflections",
+    "fetch-comments"
   ],
   student: [
-   
+    "manage_personal_section",
+    "manage_student_pages",
+    "manage_own_images",
+    "get-active-topics",
+    "create-reflection",
+    "fetch-my-reflections",
+    "fetch-comments"
+
   ]
 };
 
@@ -78,8 +103,24 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 
     const decoded = AuthUtils.verifyAccessToken(token);
     
-    // Note: You can add user existence/active status check here if needed
-    // For now, we trust the JWT token validation
+    // Check if user exists and is active
+    const userProfile = await AuthUtils.findUserByAuthUserId(decoded.userId);
+    if (!userProfile) {
+      res.status(404).json({ 
+        success: false, 
+        message: 'User profile not found' 
+      });
+      return;
+    }
+
+    // Check if user is active
+    if (userProfile.status && userProfile.status !== 'active') {
+      res.status(403).json({ 
+        success: false, 
+        message: 'Account is inactive. Please contact an administrator.' 
+      });
+      return;
+    }
 
     req.user = decoded;
     next();
@@ -90,7 +131,6 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     });
   }
 };
-
 // Legacy role-based middlewares (kept for backward compatibility if needed)
 // You can remove these if not used elsewhere in the codebase
 export const requireRole = (allowedRoles: string[]) => {
