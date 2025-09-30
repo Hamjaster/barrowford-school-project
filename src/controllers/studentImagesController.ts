@@ -32,7 +32,32 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
     // Use provided year_group_id or fall back to student's year_group_id
     const targetYearGroupId = year_group_id || student.year_group_id;
 
-    // create moderation - action_type = 'create'
+    // Fetch year group name for entity_title
+    const { data: yearGroup, error: yearGroupError } = await supabase
+      .from('yeargroups')
+      .select('name')
+      .eq('id', targetYearGroupId)
+      .single();
+
+    if (yearGroupError || !yearGroup) {
+      return res.status(404).json({ error: 'Year group not found' });
+    }
+
+    // Create studentimages record with pending status
+    const { data: studentImage, error: imageErr } = await supabase
+      .from('studentimages')
+      .insert({
+        student_id: student.id,
+        year_group_id: targetYearGroupId,
+        image_url,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (imageErr) throw imageErr;
+
+    // Create moderation - action_type = 'create'
     const newContent = {
       student_id: student.id,
       year_group_id: targetYearGroupId,
@@ -46,7 +71,8 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
         entity_type: 'studentimages',
         year_group_id: targetYearGroupId,
         class_id: student.class_id,
-        entity_id: null,
+        entity_id: studentImage.id,
+        entity_title: `My Images (${yearGroup.name})`,
         old_content: null,
         new_content: newContent,
         new_attachment: image_url,
@@ -59,7 +85,7 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
 
     if (modErr) throw modErr;
 
-    res.status(201).json({ success: true, message: 'Image submitted for moderation', data: moderation });
+    res.status(201).json({ success: true, message: 'Image submitted for moderation', data: { studentImage, moderation } });
   } catch (err) {
     console.error('uploadStudentImage error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -77,7 +103,7 @@ export const getMyStudentImages = async (req: AuthenticatedRequest, res: Respons
 
     let query = supabase
       .from('studentimages')
-      .select('id, image_url, created_at')
+      .select('id, image_url, created_at, status')
       .eq('student_id', student.id);
 
     // Filter by year_group_id if provided
@@ -119,6 +145,33 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
 
     if (imageErr || !imageRow) return res.status(404).json({ error: 'Image not found' });
 
+    // Check if image is already pending deletion
+    if (imageRow.status === 'pending_deletion') {
+      return res.status(400).json({ error: 'Image deletion is already pending moderation' });
+    }
+
+    // Update image status to pending_deletion
+    const { data: updatedImage, error: updateErr } = await supabase
+      .from('studentimages')
+      .update({ status: 'pending_deletion' })
+      .eq('id', id)
+      .eq('student_id', studentRow.id)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+
+    // Fetch year group name for entity_title
+    const { data: yearGroup, error: yearGroupError } = await supabase
+      .from('yeargroups')
+      .select('name')
+      .eq('id', imageRow.year_group_id)
+      .single();
+
+    if (yearGroupError || !yearGroup) {
+      return res.status(404).json({ error: 'Year group not found' });
+    }
+
     // create moderation (delete)
     const { data: moderation, error: modErr } = await supabase
       .from('moderations')
@@ -128,6 +181,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
         class_id: studentRow.class_id,
         entity_type: 'studentimages',
         entity_id: id,
+        entity_title: `My Images (${yearGroup.name})`,
         old_content: imageRow,
         old_attachment: imageRow.image_url,
         new_content: null,
@@ -140,7 +194,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
 
     if (modErr) throw modErr;
 
-    res.json({ success: true, message: 'Deletion submitted for moderation', data : moderation });
+    res.json({ success: true, message: 'Deletion submitted for moderation', data: { updatedImage, moderation } });
   } catch (err) {
     console.error('deleteMyStudentImage error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -157,7 +211,7 @@ export const getStudentImagesByTeacher = async (req: AuthenticatedRequest, res: 
 
     const { data, error } = await supabase
       .from('studentimages')
-      .select('id, image_url, created_at')
+      .select('id, image_url, created_at, status')
       .eq('student_id', studentId)
       .order('created_at', { ascending: false });
 
@@ -187,12 +241,13 @@ export const deleteStudentImages = async (req: AuthenticatedRequest, res: Respon
 
     if (oldError) throw oldError;
 
-    const { error } = await supabase
+    // Actually delete the record
+    const { error: deleteError } = await supabase
       .from('studentimages')
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
 
     // Get actual user ID for audit log
     const user = await findUserByAuthUserId(req.user.userId);

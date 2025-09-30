@@ -6,7 +6,6 @@ import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
 // List pending moderations (with optional filters: entity_type, student_id)
 export const listPendingModerations = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { student_id } = req.body;
     
     // Get teacher's year_group_id and class_id if the user is a teacher
     let teacherYearGroupId = null;
@@ -35,9 +34,7 @@ export const listPendingModerations = async (req: AuthenticatedRequest, res: Res
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
-    // Filter by student_id if provided
-    if (student_id) q = q.eq('student_id', student_id);
-    
+   
     // Filter by teacher's year_group_id and class_id if user is a teacher
     if (req.user.role === 'staff' && teacherYearGroupId && teacherClassId) {
       q = q.eq('year_group_id', teacherYearGroupId).eq('class_id', teacherClassId);
@@ -104,24 +101,24 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
 
     if (mod.entity_type === 'studentimages') {
       if (mod.action_type === 'create') {
-        // insert into studentimages using new_content
-        const insertPayload = mod.new_content; // expect { student_id, year_group_id, image_url }
-        const { data: inserted, error: insertErr } = await supabase
+        // Update existing studentimages record status to 'approved'
+        const { data: updated, error: updateErr } = await supabase
           .from('studentimages')
-          .insert(insertPayload)
+          .update({ status: 'approved' })
+          .eq('id', mod.entity_id)
           .select()
           .single();
 
-        if (insertErr) throw insertErr;
-        applyResult = inserted;
+        if (updateErr) throw updateErr;
+        applyResult = updated;
 
         // Log audit for create action
         await logAudit({
           action: 'create',
           entityType: 'studentimages',
-          entityId: inserted.id,
-          oldValue: null,
-          newValue: inserted,
+          entityId: mod.entity_id,
+          oldValue: { ...mod.new_content, status: 'pending' },
+          newValue: updated,
           actorId: mod.student_id,
           actorRole: 'student'
         });
@@ -148,6 +145,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
           actorRole: 'student'
         });
       } else if (mod.action_type === 'delete') {
+        // Actually delete the record when deletion is approved
         const { error: delErr } = await supabase
           .from('studentimages')
           .delete()
@@ -168,34 +166,79 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
         });
       }
     } else if (mod.entity_type === 'reflection') {
-        // REFLECTIONS ARE NOT DEVELOPED YET
-    //   if (mod.action_type === 'create') {
-    //     const insertPayload = mod.new_content; // must be { student_id, year_group_id, topic_id, content, attachment_url }
-    //     const { data: inserted, error: insertErr } = await supabase
-    //       .from('reflections')
-    //       .insert(insertPayload)
-    //       .select()
-    //       .single();
-    //     if (insertErr) throw insertErr;
-    //     applyResult = inserted;
-    //   } else if (mod.action_type === 'update') {
-    //     const updatePayload = mod.new_content;
-    //     const { data: updated, error: updateErr } = await supabase
-    //       .from('reflections')
-    //       .update(updatePayload)
-    //       .eq('id', mod.entity_id)
-    //       .select()
-    //       .single();
-    //     if (updateErr) throw updateErr;
-    //     applyResult = updated;
-    //   } else if (mod.action_type === 'delete') {
-    //     const { error: delErr } = await supabase
-    //       .from('reflections')
-    //       .delete()
-    //       .eq('id', mod.entity_id);
-    //     if (delErr) throw delErr;
-    //     applyResult = { deleted: true };
-    //   }
+      if (mod.action_type === 'create') {
+        // Update existing reflection status to 'approved'
+        const { data: updated, error: updateErr } = await supabase
+          .from('reflections')
+          .update({ status: 'approved' })
+          .eq('id', mod.entity_id)
+          .select()
+          .single();
+
+        if (updateErr) throw updateErr;
+        applyResult = updated;
+
+        // Log audit for create action
+        await logAudit({
+          action: 'create',
+          entityType: 'reflections',
+          entityId: mod.entity_id,
+          oldValue: { ...mod.new_content, status: 'pending' },
+          newValue: updated,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      } else if (mod.action_type === 'update') {
+        const updatePayload = mod.new_content;
+        const { data: updated, error: updateErr } = await supabase
+          .from('reflections')
+          .update(updatePayload)
+          .eq('id', mod.entity_id)
+          .select()
+          .single();
+        if (updateErr) throw updateErr;
+        applyResult = updated;
+
+        // Log audit for update action
+        await logAudit({
+          action: 'update',
+          entityType: 'reflections',
+          entityId: mod.entity_id,
+          oldValue: mod.old_content,
+          newValue: updated,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      } else if (mod.action_type === 'delete') {
+        // Delete all comments associated with this reflection first
+        const { error: deleteCommentsError } = await supabase
+          .from('reflectioncomments')
+          .delete()
+          .eq('reflection_id', mod.entity_id);
+
+        if (deleteCommentsError) {
+          throw deleteCommentsError;
+        }
+
+        // Delete the reflection itself
+        const { error: delErr } = await supabase
+          .from('reflections')
+          .delete()
+          .eq('id', mod.entity_id);
+        if (delErr) throw delErr;
+        applyResult = { deleted: true };
+
+        // Log audit for delete action
+        await logAudit({
+          action: 'delete',
+          entityType: 'reflections',
+          entityId: mod.entity_id,
+          oldValue: mod.old_content,
+          newValue: null,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      }
     } else if (mod.entity_type === 'studentlearningentities') {
       // map to studentlearningentities
       if (mod.action_type === 'create') {
@@ -286,6 +329,48 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
 
     if (modErr || !mod) return res.status(404).json({ success: false, error: 'Moderation not found' });
     if (mod.status !== 'pending') return res.status(400).json({ success: false, error: 'Moderation not pending' });
+
+    // Handle studentimages rejection by updating status
+    if (mod.entity_type === 'studentimages') {
+      if (mod.action_type === 'create') {
+        // Rejecting creation - update status to 'rejected'
+        const { error: imageUpdateErr } = await supabase
+          .from('studentimages')
+          .update({ status: 'rejected' })
+          .eq('id', mod.entity_id);
+
+        if (imageUpdateErr) throw imageUpdateErr;
+      } else if (mod.action_type === 'delete') {
+        // Rejecting deletion - revert status back to 'approved'
+        const { error: imageUpdateErr } = await supabase
+          .from('studentimages')
+          .update({ status: 'approved' })
+          .eq('id', mod.entity_id);
+
+        if (imageUpdateErr) throw imageUpdateErr;
+      }
+    }
+
+    // Handle reflection rejection by updating status
+    if (mod.entity_type === 'reflection') {
+      if (mod.action_type === 'create') {
+        // Rejecting creation - update status to 'rejected'
+        const { error: reflectionUpdateErr } = await supabase
+          .from('reflections')
+          .update({ status: 'rejected' })
+          .eq('id', mod.entity_id);
+
+        if (reflectionUpdateErr) throw reflectionUpdateErr;
+      } else if (mod.action_type === 'delete') {
+        // Rejecting deletion - revert status back to 'approved'
+        const { error: reflectionUpdateErr } = await supabase
+          .from('reflections')
+          .update({ status: 'approved' })
+          .eq('id', mod.entity_id);
+
+        if (reflectionUpdateErr) throw reflectionUpdateErr;
+      }
+    }
 
     const { error: modUpdateErr } = await supabase
       .from('moderations')

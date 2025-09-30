@@ -57,7 +57,8 @@ const permissions = {
     "get-active-topics",
     "create-reflection",
     "fetch-my-reflections",
-    "fetch-comments"
+    "fetch-comments",
+    "fetch-all-topics"
 
   ]
 };
