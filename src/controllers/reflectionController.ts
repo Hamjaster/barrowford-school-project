@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
-import { calculateAcademicWeek } from '../utils/lib.js';
+import { calculateAcademicWeek, getPreviousWeeks } from '../utils/lib.js';
 
 
 export const createReflectioTopic = async (req:AuthenticatedRequest,res : Response)=>{
@@ -197,7 +197,7 @@ export const fetchActiveTopics = async (req: AuthenticatedRequest, res: Response
 
 export const createReflection = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { topicID, content, attachmentUrl } = req.body;
+    const { topicID, content, attachmentUrl, selectedWeek } = req.body;
 
     if (!topicID) return res.status(400).json({ error: 'Title is required' });
     if (!content) return res.status(400).json({ error: 'Content is required' });
@@ -216,21 +216,22 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
       return res.status(404).json({ error: 'Student record not found' });
     }
    
-    // Check if the student has already submitted for this topic
+    // Check if the student has already submitted for this topic (whose status can be pending, approved, pending_deletion)
     const { data: existingReflection, error: existingError } = await supabase
       .from('reflections')
       .select('id')
       .eq('student_id', student.id)
       .eq('topic_id', topicID)
+      
       .single()
 
     if (existingReflection) {
       return res.status(403).json({ error: 'You have already submitted a reflection for this topic' });
     }
 
-    // Calculate the current academic week
-    const weekLabel = calculateAcademicWeek();
-    console.log('calculated weekLabel!!', weekLabel);
+    // Use selected week if provided, otherwise calculate the current academic week
+    const weekLabel = selectedWeek || calculateAcademicWeek();
+    console.log('using weekLabel!!', weekLabel);
 
     // Check if the student has already submitted a reflection for this week
     const { data: existingWeekReflection, error: existingWeekError } = await supabase
@@ -238,6 +239,7 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
       .select('id, week')
       .eq('student_id', student.id)
       .eq('week', weekLabel)
+      .in('status', ['pending', 'approved', 'pending_deletion'])
       .maybeSingle()
 
     if (existingWeekReflection) {
@@ -257,13 +259,31 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
       return res.status(404).json({ error: 'Topic not found' });
     }
 
-    // Create moderation request instead of direct creation
+    // Create reflection record with pending status
+    const { data: reflection, error: reflectionError } = await supabase
+      .from('reflections')
+      .insert({
+        student_id: student.id,
+        year_group_id: student.year_group_id,
+        topic_id: topicID,
+        content,
+        attachment_url: imageURL,
+        week: weekLabel,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (reflectionError) throw reflectionError;
+
+    // Create moderation request
     const moderationData = {
       entity_type: 'reflection',
       action_type: 'create',
       student_id: student.id,
       year_group_id: student.year_group_id,
       class_id: student.class_id,
+      entity_id: reflection.id,
       entity_title: topic.title,
       new_content: {
         student_id: student.id,
@@ -288,8 +308,7 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
     res.status(201).json({ 
       success: true, 
       message: 'Your reflection has been sent for moderation and will be reviewed by your teacher.',
-      moderation_id: moderation.id,
-      requires_moderation: true
+      data: { reflection, moderation }
     });
   } catch (err: any) {
     console.error("Error creating reflection moderation:", err);
@@ -341,8 +360,9 @@ export const fetchReflectionsByStudentId = async (req: AuthenticatedRequest, res
       created_at,
       topic_id,
       status,
+      week,
       reflectiontopics!inner(title),
-      reflectioncomments!inner(id,comment,created_at,user_role)
+      reflectioncomments(id,comment,created_at,user_role)
     `)
     .eq("student_id", studentId)
     .order("created_at", { ascending: false });
@@ -657,10 +677,21 @@ export const requestDeleteReflection = async (req: AuthenticatedRequest, res: Re
       return res.status(404).json({ error: "Reflection not found or you don't have permission to delete it" });
     }
 
-    // Check if reflection is already approved (students can't delete approved reflections)
-    if (reflection.status === 'approved') {
-      return res.status(403).json({ error: "Approved reflections cannot be deleted" });
+    // Check if reflection is already pending deletion
+    if (reflection.status === 'pending_deletion') {
+      return res.status(400).json({ error: 'Reflection deletion is already pending moderation' });
     }
+
+    // Update reflection status to pending_deletion
+    const { data: updatedReflection, error: updateError } = await supabase
+      .from('reflections')
+      .update({ status: 'pending_deletion' })
+      .eq('id', reflectionId)
+      .eq('student_id', student.id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
 
     // Fetch topic title for entity_title
     const { data: topic, error: topicError } = await supabase
@@ -697,12 +728,34 @@ export const requestDeleteReflection = async (req: AuthenticatedRequest, res: Re
     res.status(200).json({ 
       success: true, 
       message: 'Your request to delete this reflection has been sent for moderation and will be reviewed by your teacher.',
-      moderation_id: moderation.id,
-      requires_moderation: true
+      data: { updatedReflection, moderation }
     });
 
   } catch (err: any) {
     console.error("Error requesting reflection deletion:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Get previous weeks for a user
+export const getPreviousWeeksForUser = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Get the current academic week
+    const currentWeek = calculateAcademicWeek();
+    
+    // Get previous weeks using the utility function
+    const previousWeeks = getPreviousWeeks(currentWeek);
+    
+    res.status(200).json({ 
+      success: true, 
+      data: {
+        currentWeek,
+        previousWeeks,
+        totalPreviousWeeks: previousWeeks.length
+      }
+    });
+  } catch (err: any) {
+    console.error("Error getting previous weeks:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };

@@ -146,6 +146,22 @@ export const getAllPersonalSectionTopics = async (req: Request, res: Response) =
   }
 };
 
+// Get all personal section topics (including inactive) - for staff management
+export const getAllPersonalSectionTopicsForManagement = async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('personalsectiontopics')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ success: true, data });
+  } catch (err: any) {
+    console.error('Error fetching all personal section topics:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Activate personal section topic
 export const togglePersonalSectionTopicStatus = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -216,6 +232,23 @@ export const createPersonalSection = async (req: AuthenticatedRequest, res: Resp
 
     if (studentError || !student) {
       return res.status(404).json({ error: 'Student record not found' });
+    }
+
+    // Check if personal section already exists for this student and topic
+    const { data: existingSection, error: existingError } = await supabase
+      .from('personalsections')
+      .select('id')
+      .eq('student_id', student.id)
+      .eq('topic_id', topic_id)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    if (existingSection) {
+      return res.status(409).json({ 
+        error: 'Personal section already exists for this topic',
+        message: 'You have already created a personal section for this topic. Please update the existing one instead.'
+      });
     }
 
     const { data, error } = await supabase

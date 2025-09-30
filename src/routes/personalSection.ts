@@ -5,6 +5,7 @@ import {
   updatePersonalSectionTopic,
   deletePersonalSectionTopic,
   getAllPersonalSectionTopics,
+  getAllPersonalSectionTopicsForManagement,
   togglePersonalSectionTopicStatus,
   getMyPersonalSectionByTopic,
   getStudentPersonalSections,
@@ -19,6 +20,7 @@ router.post('/topics', authenticateToken, checkPermission('manage_users'), creat
 router.put('/topics/:id', authenticateToken, checkPermission('manage_users'), updatePersonalSectionTopic as any);
 router.delete('/topics/:id', authenticateToken, checkPermission('manage_users'), deletePersonalSectionTopic as any);
 router.patch('/topics/status/:id', authenticateToken, checkPermission('manage_users'), togglePersonalSectionTopicStatus as any);
+router.get('/topics/all', authenticateToken, checkPermission('manage_users'), getAllPersonalSectionTopicsForManagement as any);
 
 // Intended for students
 router.get('/topics', authenticateToken, getAllPersonalSectionTopics as any);

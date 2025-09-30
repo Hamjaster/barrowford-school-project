@@ -3,7 +3,7 @@ import { authenticateToken, checkPermission } from '../middleware/auth.js';
 import { createReflectioTopic, fetchActiveTopics,createReflection,fetchAllReflectionsWithTitle,
     fetchStudentReflections,UpdateReflection,addComment,
     fetchComments,fetchReflectionsByStudentId,deleteReflection,requestDeleteReflection,
-    fetchAllTopics, updateTopic, deleteTopic
+    fetchAllTopics, updateTopic, deleteTopic, getPreviousWeeksForUser
  } from '../controllers/reflectionController.js';
 import upload from '../middleware/multer.js';
 
@@ -35,6 +35,9 @@ router.post('/addcomment',authenticateToken,checkPermission('add-comments'),addC
 router.get('/comment/:reflectionId',authenticateToken,checkPermission("fetch-comments"),fetchComments as any)
 //parents to fetch by id
 router.get("/:studentId",authenticateToken,checkPermission('get-student-reflections'), fetchReflectionsByStudentId as any);
+
+// Get previous weeks for a user
+router.get("/weeks/previous", authenticateToken, getPreviousWeeksForUser as any);
 
 
 

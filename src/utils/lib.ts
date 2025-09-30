@@ -112,4 +112,34 @@ export const calculateAcademicWeek = (date?: Date): string => {
   
   return `Week ${weekNumber}`;
 };
+
+/**
+ * Get previous weeks for a user based on the current academic week (including current week)
+ * @param currentWeek - Optional current week string (e.g., "Week 4"), defaults to current academic week
+ * @returns Array of week strings including current week (e.g., ["Week 1", "Week 2", "Week 3", "Week 4"])
+ */
+export const getPreviousWeeks = (currentWeek?: string): string[] => {
+  const week = currentWeek || calculateAcademicWeek();
+  
+  // Extract week number from string like "Week 4"
+  const weekNumberMatch = week.match(/Week (\d+)/);
+  if (!weekNumberMatch) {
+    return [];
+  }
+  
+  const currentWeekNumber = parseInt(weekNumberMatch[1], 10);
+  
+  // If current week is 1 or less, return just Week 1
+  if (currentWeekNumber <= 1) {
+    return ["Week 1"];
+  }
+  
+  // Generate array of weeks including current week
+  const previousWeeks: string[] = [];
+  for (let i = 1; i <= currentWeekNumber; i++) {
+    previousWeeks.push(`Week ${i}`);
+  }
+  
+  return previousWeeks;
+};
   
