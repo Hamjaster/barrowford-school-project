@@ -19,7 +19,7 @@ router.delete('/topics/:id',authenticateToken,checkPermission('delete-reflection
 // Reflection management routes
 router.get('/all',authenticateToken,checkPermission('all-reflections'),fetchAllReflectionsWithTitle as any)
 router.put('/update',authenticateToken,checkPermission('update-reflections'),UpdateReflection as any)
-router.delete("/:reflectionId", authenticateToken, checkPermission('delete-reflections'), deleteReflection as any);
+router.delete("/delete-reflection/:reflectionId", authenticateToken, checkPermission('delete-reflections'), deleteReflection as any);
 //reflection/update
 
 //for student to manages topic 

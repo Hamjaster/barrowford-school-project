@@ -13,12 +13,22 @@ const getStudentRecord = async (authUserId: string) => {
 // FOR MANAGERS (admin, staff, staff_admin)
 export const createPersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { title } = req.body;
+    const { title, description } = req.body;
+    
     if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    // Build the insert data dynamically
+    const insertData: Record<string, any> = { 
+      title, 
+      status: 'active' 
+    };
+    if (description?.trim()) {
+      insertData.description = description.trim();
+    }
 
     const { data, error } = await supabase
       .from('personalsectiontopics')
-      .insert({ title, status: 'active' })
+      .insert(insertData)
       .select()
       .single();
 
@@ -45,10 +55,17 @@ export const createPersonalSectionTopic = async (req: AuthenticatedRequest, res:
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
+
 export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { title } = req.body;
+    const { title, description } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
 
     // Get old value for audit log
     const { data: oldData, error: oldError } = await supabase
@@ -59,9 +76,15 @@ export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res:
 
     if (oldError) throw oldError;
 
+    // Build update object dynamically
+    const updateFields: Record<string, any> = { title };
+    if (description !== undefined) {
+      updateFields.description = description; // can be empty or updated text
+    }
+
     const { data, error } = await supabase
       .from('personalsectiontopics')
-      .update({ title })
+      .update(updateFields)
       .eq('id', id)
       .select()
       .single();
@@ -80,7 +103,7 @@ export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res:
       oldValue: oldData,
       newValue: data,
       actorId: user.id,
-      actorRole: req.user.role
+      actorRole: req.user.role,
     });
 
     res.json({ success: true, data });
@@ -89,6 +112,7 @@ export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res:
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 export const deletePersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
