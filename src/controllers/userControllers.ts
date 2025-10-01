@@ -65,7 +65,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
 
       let query = supabase
         .from(table)
-        .select("id, email, first_name, last_name, created_at, auth_user_id", {
+        .select("id, email, first_name, last_name, created_at, auth_user_id, status", {
           count: "exact",
         })
         .neq("auth_user_id", creatorUserId); // exclude current user
@@ -90,6 +90,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
             last_name: u.last_name,
             role: allowedRole,
             created_at: u.created_at,
+            status: u.status,
           }))
         );
       }

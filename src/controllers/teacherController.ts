@@ -22,8 +22,9 @@ export const getAssignedStudents = async (req: AuthenticatedRequest, res: Respon
     // Fetch students in the same year_group and class
     const { data: students, error: studentError } = await supabase
       .from('students')
-      .select('id, first_name, last_name, email, year_group_id, class_id, created_at')
+      .select('id, first_name, last_name, email, year_group_id, class_id, created_at, status')
       .eq('year_group_id', teacher.year_group_id)
+      .eq('status', 'active')
       .eq('class_id', teacher.class_id);
 
     if (studentError) throw studentError;

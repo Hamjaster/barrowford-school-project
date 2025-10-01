@@ -12,6 +12,7 @@ const getStudentRecord = async (authUserId: string) => {
     .single();
 };
 
+
 // student uploads an image
 export const uploadStudentImage = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -28,6 +29,8 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
       .eq('auth_user_id', req.user.userId)
       .single();
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
+    
+   
 
     // Use provided year_group_id or fall back to student's year_group_id
     const targetYearGroupId = year_group_id || student.year_group_id;

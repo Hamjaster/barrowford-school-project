@@ -29,7 +29,7 @@ export const getMyChildren = async (req: AuthenticatedRequest, res: Response) =>
     // Filter out inactive students
     const activeChildren = children
       .map(c => c.student)
-      .filter(student => !student.status || student.status === 'active');
+      .filter((student: any) => !student.status || student.status === 'active');
 
     res.json({ success: true, data: activeChildren });
   } catch (err: any) {
@@ -80,18 +80,29 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
       });
     }
 
-    // Fetch learnings
+    // Fetch learnings with subject information
     const { data: learnings } = await supabase
       .from('studentlearningentities')
-      .select('id, title, description, attachment_url, created_at')
+      .select(`
+        id, 
+        title, 
+        description, 
+        attachment_url, 
+        created_at,
+        subject_id,
+        subject:subjects (id, name, status)
+      `)
       .eq('student_id', studentId);
 
     // Fetch images
+    // the studentimages has year_group_id, I want to return the name of year group along with in the response
+
     const { data: images } = await supabase
       .from('studentimages')
-      .select('id, image_url, created_at')
+      .select('id, image_url, created_at,yeargroup:year_group_id ( name )')
       .eq('status', 'approved')
       .eq('student_id', studentId);
+
 
     // Fetch reflections, also include the topic title and comments
     const { data: reflections } = await supabase
@@ -107,7 +118,7 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
         status,
         week,
         reflectiontopics!inner(title),
-        reflectioncomments(id,comment,created_at,user_role)
+        reflectioncomments(id,comment,created_at,user_role,user_name)
         `
       )
       .eq('status', 'approved')

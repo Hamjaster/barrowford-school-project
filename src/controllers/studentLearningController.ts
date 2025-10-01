@@ -28,6 +28,8 @@ export const addStudentLearning = async (req: AuthenticatedRequest, res: Respons
       const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
       if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
       
+
+      
       const new_content = {
         student_id: student.id,
         subject_id: subject_id,
@@ -121,6 +123,9 @@ export const getMyLearnings = async (req: AuthenticatedRequest, res: Response) =
 
     const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
+    
+    
+    
 // only return learnings for the subject_id if provided
     const { data, error } = await supabase
       .from('studentlearningentities')
