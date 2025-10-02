@@ -77,7 +77,7 @@ export const updateSubject = async (req: AuthenticatedRequest, res: Response) =>
       actorRole: req.user.role
     });
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating subject:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -119,7 +119,7 @@ export const deleteSubject = async (req: AuthenticatedRequest, res: Response) =>
       actorRole: req.user.role
     });
 
-    res.json({ success: true, message: 'Subject deleted successfully' });
+    res.status(200).json({ success: true, message: 'Subject deleted successfully' });
   } catch (err: any) {
     console.error('Error deleting subject:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -135,7 +135,7 @@ export const getAllSubjects = async (req: Request, res: Response) => {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching subjects:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -185,7 +185,7 @@ const {status} = req.body;
       actorRole: req.user.role
     });
 
-    res.json({ success: true, message: 'Subject status toggled successfully', data });
+    res.status(200).json({ success: true, message: 'Subject status toggled successfully', data });
   } catch (err: any) {
     console.error('Error toggling subject status:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -201,7 +201,7 @@ export const getAllYearGroups = async (req: Request, res: Response) => {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching year groups:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -236,7 +236,7 @@ export const getSubjectsByYearGroup = async (req: Request, res: Response) => {
       .map((item: any) => item.subjects)
       .filter((subject: any) => subject != null && subject.status === 'active');
 
-    res.json({ success: true, data: subjects });
+    res.status(200).json({ success: true, data: subjects });
   } catch (err: any) {
     console.error('Error fetching subjects by year group:', err);
     res.status(500).json({ error: 'Internal server error' });

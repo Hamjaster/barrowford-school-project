@@ -23,31 +23,9 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration
-const allowedOrigins = [
-  config.frontendUrl,
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:4173',
-  // TODO: fix this laterr
-  'https://nybble-bradford-school-frontend.vercel.app'
-];
-
-// Remove duplicates and filter out undefined values
-const uniqueOrigins = [...new Set(allowedOrigins.filter(origin => origin))];
-
+// CORS configuration - Allow all origins
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    if (uniqueOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.log('CORS blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: true, // Allow all origins
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -88,7 +66,7 @@ app.use('/api/moderation', moderationRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
     message: 'Welcome to School Portal API',
     version: '1.0.0',
@@ -113,7 +91,7 @@ const startServer = async () => {
       console.log(`🚀 Server running on http://localhost:${config.port}`);
       console.log(`📝 Environment: ${config.nodeEnv}`);
       console.log(`🔗 API Base URL: http://localhost:${config.port}/api`);
-      console.log(`🌐 Allowed CORS origins:`, uniqueOrigins);
+      console.log(`🌐 CORS: All origins allowed`);
 
     });
   } catch (error) {

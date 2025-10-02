@@ -106,7 +106,7 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
         .single();
       if (modErr) throw modErr;
 
-      res.json({ success: true, message: 'Deletion of Learning submitted for moderation', data : moderation });
+      res.status(200).json({ success: true, message: 'Deletion of Learning submitted for moderation', data : moderation });
     } catch (err: any) {
       console.error('Error deleting student learning:', err);
       res.status(500).json({ error: 'Internal server error' });
@@ -135,7 +135,7 @@ export const getMyLearnings = async (req: AuthenticatedRequest, res: Response) =
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching student learnings:', err);
     res.status(500).json({ error: 'Internal server error' });

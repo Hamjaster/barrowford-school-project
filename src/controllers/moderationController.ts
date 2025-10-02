@@ -60,7 +60,7 @@ export const listPendingModerations = async (req: AuthenticatedRequest, res: Res
       return true;
     }) || [];
 
-    res.json({ success: true, data: activeModerations });
+    res.status(200).json({ success: true, data: activeModerations });
   } catch (err) {
     console.error('listPendingModerations error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -94,7 +94,7 @@ export const getModerationById = async (req: AuthenticatedRequest, res: Response
       });
     }
     
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('getModerationById error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -350,7 +350,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
     if (modUpdateErr) throw modUpdateErr;
 
 
-    res.json({ success: true, data: applyResult });
+    res.status(200).json({ success: true, data: applyResult });
   } catch (err) {
     console.error('approveModeration error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -449,7 +449,7 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
 
     if (modUpdateErr) throw modUpdateErr;
 
-    res.json({ success: true, message: 'Moderation rejected' });
+    res.status(200).json({ success: true, message: 'Moderation rejected' });
   } catch (err) {
     console.error('rejectModeration error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });

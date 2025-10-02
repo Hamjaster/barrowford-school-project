@@ -111,7 +111,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
 
     const totalPages = Math.ceil(totalCount / limitNum);
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: {
         users: paginatedUsers,
@@ -177,7 +177,7 @@ export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response)
       actorRole: req.user.role
     });
 
-    res.json({ success: true, message: `${role} ${action}d successfully` });
+    res.status(200).json({ success: true, message: `${role} ${action}d successfully` });
   } catch (err: any) {
     console.error('Error toggling status:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -269,7 +269,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
       }
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
       message: `${role} user deleted successfully`,
       deletedUser: {

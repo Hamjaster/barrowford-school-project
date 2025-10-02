@@ -31,7 +31,7 @@ export const getMyChildren = async (req: AuthenticatedRequest, res: Response) =>
       .map(c => c.student)
       .filter((student: any) => !student.status || student.status === 'active');
 
-    res.json({ success: true, data: activeChildren });
+    res.status(200).json({ success: true, data: activeChildren });
   } catch (err: any) {
     console.error('Error fetching children for parent:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -124,7 +124,7 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
       .eq('status', 'approved')
       .eq('student_id', studentId);
 
-    res.json({
+    res.status(200).json({
       success: true,
       data: {
         student,

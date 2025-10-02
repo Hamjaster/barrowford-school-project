@@ -185,7 +185,7 @@ export const login = async (req: Request, res: Response) => {
     response.user.username = AuthUtils.generateUsername(userProfile.first_name, userProfile.last_name);
   }
 
-  res.json(response);
+  res.status(200).json(response);
 };
 
 export const createUser = async (req: AuthenticatedRequest, res: Response) => {
@@ -428,7 +428,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
   if (error) return res.status(400).json({ success: false, message: 'Failed to send reset email' });
 
-  res.json({ success: true, message: 'Password reset email sent' });
+  res.status(200).json({ success: true, message: 'Password reset email sent' });
 };
 
 // RESET PASSWORD - Update password using Supabase Auth (called from frontend after email link click)
@@ -509,7 +509,7 @@ export const resetPassword = async (req: Request, res: Response) => {
       });
     }
 
-    res.json({ 
+    res.status(200).json({ 
       success: true,
       message: 'Password has been reset successfully' 
     });
@@ -570,9 +570,9 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
       });
     }
 
-    res.json({ 
+    res.status(200).json({ 
       success: true,
-      message: `Password for ${targetUser.email} has been reset successfully` 
+      message: `Password for ${targetUser.email} has been reset successfully`
     });
 
   } catch (error) {

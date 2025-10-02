@@ -29,7 +29,7 @@ export const getAssignedStudents = async (req: AuthenticatedRequest, res: Respon
 
     if (studentError) throw studentError;
 
-    res.json({ success: true, data: students });
+    res.status(200).json({ success: true, data: students });
   } catch (err: any) {
     console.error('Error fetching assigned students:', err);
     res.status(500).json({ error: 'Internal server error' });
