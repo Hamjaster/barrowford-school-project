@@ -549,7 +549,7 @@ export const fetchComments = async (req: AuthenticatedRequest, res: Response) =>
 export const deleteReflection = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { reflectionId } = req.params;
-console.log("deletingreflectionfor",reflectionId)
+console.log("ReflectionDeleting",reflectionId)
     if (!reflectionId) {
       return res.status(400).json({ error: "Reflection ID is required" });
     }

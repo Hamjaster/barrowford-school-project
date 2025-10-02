@@ -20,7 +20,6 @@ const permissions = {
     "manage_users",
     "get_users",
     "manage_student_images"
-
   ],
   staff_admin: [
     "manage_users",
@@ -59,7 +58,6 @@ const permissions = {
     "create-reflection",
     "fetch-my-reflections",
     "fetch-comments"
-
   ]
 };
 
