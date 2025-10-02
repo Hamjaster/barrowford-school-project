@@ -42,7 +42,8 @@ const permissions = {
     "fetch-comments",
      "moderate_content",
      "get-student-reflections",
-     "view_teacher_profile"
+     "view_teacher_profile",
+     "update_student_profile_photo"
   ],
   parent: [
     "view_children",
