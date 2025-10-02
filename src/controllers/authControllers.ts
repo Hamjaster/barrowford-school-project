@@ -94,6 +94,7 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
             email: additionalData.email,
             first_name: additionalData.first_name,
             last_name: additionalData.last_name,
+            profile_photo: additionalData.profile_photo
           })
           .select()
           .single();
@@ -185,7 +186,7 @@ export const login = async (req: Request, res: Response) => {
     response.user.username = AuthUtils.generateUsername(userProfile.first_name, userProfile.last_name);
   }
 
-  res.json(response);
+  res.status(200).json(response);
 };
 
 export const createUser = async (req: AuthenticatedRequest, res: Response) => {
@@ -199,8 +200,10 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       role, 
       parent_ids, // an array of parent ids
       year_group_id,
-      class_id
+      class_id,
+      profile_photo
     } = req.body;
+    console.log("req.body",req.body)
     const creatorRole = req.user.role;
     let emailToUse = email;
 
@@ -294,7 +297,7 @@ parentDataList = fetchedParents;
     // Create user directly in role-specific table
     if (authData.user) {
       try {
-        const userData = {
+        const userData: Record<string, any> = {
           first_name,
           last_name,
           email: emailToUse,
@@ -304,7 +307,9 @@ parentDataList = fetchedParents;
           parent_ids,
           username,
         };
-
+        if (profile_photo) {
+          userData.profile_photo = profile_photo;
+        }
         console.log("User data", userData);
 
         const createdUser = await createRoleSpecificEntry( role, userData);
@@ -412,7 +417,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
   const user = await AuthUtils.findUserByEmail(email);
   if (!user) {
-    return res.status(200).json({ success: true, message: 'If an account exists, a reset link has been sent' });
+    return res.status(200).json({ success: true, message: 'A reset link has been sent to that email address' });
   }
 
   if (user.role === 'student') {
@@ -428,7 +433,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
   if (error) return res.status(400).json({ success: false, message: 'Failed to send reset email' });
 
-  res.json({ success: true, message: 'Password reset email sent' });
+  res.status(200).json({ success: true, message: 'Password reset email sent' });
 };
 
 // RESET PASSWORD - Update password using Supabase Auth (called from frontend after email link click)
@@ -509,7 +514,7 @@ export const resetPassword = async (req: Request, res: Response) => {
       });
     }
 
-    res.json({ 
+    res.status(200).json({ 
       success: true,
       message: 'Password has been reset successfully' 
     });
@@ -570,9 +575,9 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
       });
     }
 
-    res.json({ 
+    res.status(200).json({ 
       success: true,
-      message: `Password for ${targetUser.email} has been reset successfully` 
+      message: `Password for ${targetUser.email} has been reset successfully`
     });
 
   } catch (error) {

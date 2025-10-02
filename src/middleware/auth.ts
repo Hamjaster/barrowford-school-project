@@ -20,7 +20,6 @@ const permissions = {
     "manage_users",
     "get_users",
     "manage_student_images"
-
   ],
   staff_admin: [
     "manage_users",
@@ -42,7 +41,8 @@ const permissions = {
     "add-comments",
     "fetch-comments",
      "moderate_content",
-     "get-student-reflections"
+     "get-student-reflections",
+     "view_teacher_profile"
   ],
   parent: [
     "view_children",
@@ -57,7 +57,8 @@ const permissions = {
     "get-active-topics",
     "create-reflection",
     "fetch-my-reflections",
-    "fetch-comments"
+    "fetch-comments",
+    "fetch-all-topics"
 
   ]
 };

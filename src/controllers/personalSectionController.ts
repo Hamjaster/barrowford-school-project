@@ -13,12 +13,22 @@ const getStudentRecord = async (authUserId: string) => {
 // FOR MANAGERS (admin, staff, staff_admin)
 export const createPersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { title } = req.body;
+    const { title, description } = req.body;
+    
     if (!title) return res.status(400).json({ error: 'Title is required' });
+
+    // Build the insert data dynamically
+    const insertData: Record<string, any> = { 
+      title, 
+      status: 'active' 
+    };
+    if (description?.trim()) {
+      insertData.description = description.trim();
+    }
 
     const { data, error } = await supabase
       .from('personalsectiontopics')
-      .insert({ title, status: 'active' })
+      .insert(insertData)
       .select()
       .single();
 
@@ -45,10 +55,17 @@ export const createPersonalSectionTopic = async (req: AuthenticatedRequest, res:
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
+
 export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { title } = req.body;
+    const { title, description } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
 
     // Get old value for audit log
     const { data: oldData, error: oldError } = await supabase
@@ -59,9 +76,15 @@ export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res:
 
     if (oldError) throw oldError;
 
+    // Build update object dynamically
+    const updateFields: Record<string, any> = { title };
+    if (description !== undefined) {
+      updateFields.description = description; // can be empty or updated text
+    }
+
     const { data, error } = await supabase
       .from('personalsectiontopics')
-      .update({ title })
+      .update(updateFields)
       .eq('id', id)
       .select()
       .single();
@@ -80,15 +103,16 @@ export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res:
       oldValue: oldData,
       newValue: data,
       actorId: user.id,
-      actorRole: req.user.role
+      actorRole: req.user.role,
     });
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating personal section topic:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 export const deletePersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -124,7 +148,7 @@ export const deletePersonalSectionTopic = async (req: AuthenticatedRequest, res:
       actorRole: req.user.role
     });
 
-    res.json({ success: true, message: 'Topic deleted successfully' });
+    res.status(200).json({ success: true, message: 'Topic deleted successfully' });
   } catch (err: any) {
     console.error('Error deleting personal section topic:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -139,9 +163,25 @@ export const getAllPersonalSectionTopics = async (req: Request, res: Response) =
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching personal section topics:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Get all personal section topics (including inactive) - for staff management
+export const getAllPersonalSectionTopicsForManagement = async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('personalsectiontopics')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.status(200).json({ success: true, data });
+  } catch (err: any) {
+    console.error('Error fetching all personal section topics:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -189,7 +229,7 @@ const {status} = req.body;
       actorRole: req.user.role
     });
 
-    res.json({ success: true, message: 'Topic status toggled successfully', data });
+    res.status(200).json({ success: true, message: 'Topic status toggled successfully', data });
   } catch (err: any) {
     console.error('Error toggling personal section topic status:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -216,6 +256,23 @@ export const createPersonalSection = async (req: AuthenticatedRequest, res: Resp
 
     if (studentError || !student) {
       return res.status(404).json({ error: 'Student record not found' });
+    }
+
+    // Check if personal section already exists for this student and topic
+    const { data: existingSection, error: existingError } = await supabase
+      .from('personalsections')
+      .select('id')
+      .eq('student_id', student.id)
+      .eq('topic_id', topic_id)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    if (existingSection) {
+      return res.status(409).json({ 
+        error: 'Personal section already exists for this topic',
+        message: 'You have already created a personal section for this topic. Please update the existing one instead.'
+      });
     }
 
     const { data, error } = await supabase
@@ -300,7 +357,7 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
       actorRole: req.user.role
     });
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating personal section:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -339,7 +396,7 @@ export const getStudentPersonalSections = async (req: AuthenticatedRequest, res:
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching student personal sections:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -381,7 +438,7 @@ export const updatePersonalSectionByTeacher = async (req: AuthenticatedRequest, 
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating personal section:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -414,7 +471,7 @@ export const getMyPersonalSections = async (req: AuthenticatedRequest, res: Resp
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching personal sections:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -452,7 +509,7 @@ export const getMyPersonalSectionByTopic = async (req: AuthenticatedRequest, res
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching personal section by topic:', err);
     res.status(500).json({ error: 'Internal server error' });
