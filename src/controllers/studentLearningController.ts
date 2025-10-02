@@ -27,6 +27,7 @@ export const addStudentLearning = async (req: AuthenticatedRequest, res: Respons
       // find student
       const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
       if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
+      
       const new_content = {
         student_id: student.id,
         subject_id: subject_id,
@@ -43,6 +44,7 @@ export const addStudentLearning = async (req: AuthenticatedRequest, res: Respons
           class_id: student.class_id,
           entity_type: 'studentlearningentities',
           entity_id: null,
+          entity_title: title, // Use the title directly as entity_title
           old_content: null,
           new_content: new_content,
           action_type: 'create',
@@ -91,6 +93,7 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
           class_id: student.class_id,
           entity_type: 'studentlearningentities',
           entity_id: id,
+          entity_title: learningRow.title, // Use the title from the learning row
           old_content: learningRow,
           new_content: null,
           action_type: 'delete',

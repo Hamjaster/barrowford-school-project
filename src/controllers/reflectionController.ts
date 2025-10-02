@@ -1,7 +1,7 @@
 import { Response } from 'express';
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
-import uploadfile from '../utils/uploadfiles.js'
+import { calculateAcademicWeek, getPreviousWeeks } from '../utils/lib.js';
 
 
 export const createReflectioTopic = async (req:AuthenticatedRequest,res : Response)=>{
@@ -197,26 +197,18 @@ export const fetchActiveTopics = async (req: AuthenticatedRequest, res: Response
 
 export const createReflection = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { topicID, content } = req.body;
-    const file = req.file;
+    const { topicID, content, attachmentUrl, selectedWeek } = req.body;
 
     if (!topicID) return res.status(400).json({ error: 'Title is required' });
     if (!content) return res.status(400).json({ error: 'Content is required' });
 
-    let imageURL: string = "";
-    if (file) {
-      const response = await uploadfile(file.path);
-      if (response.success && response.url) {
-        imageURL = response.url;
-      } else {
-        return res.status(400).json({ error: 'File upload failed, please try again' });
-      }
-    }
+    // Use the attachmentUrl directly from the request body
+    const imageURL = attachmentUrl || "";
 
     // Fetch student id using auth_user_id (UUID from Supabase Auth)
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, year_group_id')
+      .select('id, year_group_id, class_id')
       .eq('auth_user_id', req.user.userId)
       .maybeSingle()
 
@@ -224,20 +216,51 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
       return res.status(404).json({ error: 'Student record not found' });
     }
    
-    // Check if the student has already submitted for this topic
+    // Check if the student has already submitted for this topic (whose status can be pending, approved, pending_deletion)
     const { data: existingReflection, error: existingError } = await supabase
       .from('reflections')
       .select('id')
       .eq('student_id', student.id)
       .eq('topic_id', topicID)
+      
       .single()
 
     if (existingReflection) {
       return res.status(403).json({ error: 'You have already submitted a reflection for this topic' });
     }
 
-    // Save the reflection
-    const { data, error } = await supabase
+    // Use selected week if provided, otherwise calculate the current academic week
+    const weekLabel = selectedWeek || calculateAcademicWeek();
+    console.log('using weekLabel!!', weekLabel);
+
+    // Check if the student has already submitted a reflection for this week
+    const { data: existingWeekReflection, error: existingWeekError } = await supabase
+      .from('reflections')
+      .select('id, week')
+      .eq('student_id', student.id)
+      .eq('week', weekLabel)
+      .in('status', ['pending', 'approved', 'pending_deletion'])
+      .maybeSingle()
+
+    if (existingWeekReflection) {
+      return res.status(403).json({ 
+        error: `You have already submitted a reflection for ${weekLabel}. Students can only create one reflection per week.` 
+      });
+    }
+
+    // Fetch topic title for entity_title
+    const { data: topic, error: topicError } = await supabase
+      .from('reflectiontopics')
+      .select('title')
+      .eq('id', topicID)
+      .single();
+
+    if (topicError || !topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
+    // Create reflection record with pending status
+    const { data: reflection, error: reflectionError } = await supabase
       .from('reflections')
       .insert({
         student_id: student.id,
@@ -245,16 +268,50 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
         topic_id: topicID,
         content,
         attachment_url: imageURL,
+        week: weekLabel,
         status: 'pending'
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (reflectionError) throw reflectionError;
 
-    res.status(201).json({ success: true, data });
+    // Create moderation request
+    const moderationData = {
+      entity_type: 'reflection',
+      action_type: 'create',
+      student_id: student.id,
+      year_group_id: student.year_group_id,
+      class_id: student.class_id,
+      entity_id: reflection.id,
+      entity_title: topic.title,
+      new_content: {
+        student_id: student.id,
+        year_group_id: student.year_group_id,
+        topic_id: topicID,
+        content,
+        attachment_url: imageURL,
+        week: weekLabel,
+        status: 'pending'
+      },
+      status: 'pending'
+    };
+
+    const { data: moderation, error: moderationError } = await supabase
+      .from('moderations')
+      .insert(moderationData)
+      .select()
+      .single();
+
+    if (moderationError) throw moderationError;
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Your reflection has been sent for moderation and will be reviewed by your teacher.',
+      data: { reflection, moderation }
+    });
   } catch (err: any) {
-    console.error("Error creating reflection:", err);
+    console.error("Error creating reflection moderation:", err);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -303,8 +360,9 @@ export const fetchReflectionsByStudentId = async (req: AuthenticatedRequest, res
       created_at,
       topic_id,
       status,
+      week,
       reflectiontopics!inner(title),
-      reflectioncomments!inner(id,comment,created_at,user_role)
+      reflectioncomments(id,comment,created_at,user_role)
     `)
     .eq("student_id", studentId)
     .order("created_at", { ascending: false });
@@ -320,7 +378,7 @@ export const fetchReflectionsByStudentId = async (req: AuthenticatedRequest, res
 
 
 //stuents fetch their own reflection 
-export const fetchStudentReflectionsWithTitle = async (req: AuthenticatedRequest, res: Response) => {
+export const fetchStudentReflections = async (req: AuthenticatedRequest, res: Response) => {
   try {
        // Find student record
     const { data: student, error: studentError } = await supabase
@@ -343,15 +401,21 @@ export const fetchStudentReflectionsWithTitle = async (req: AuthenticatedRequest
       created_at,
       topic_id,
       status,
+      week,
       reflectiontopics!inner(title)
     `)
     .eq("student_id", student.id)
     .order("created_at", { ascending: false });
 
-
+    const flattenedData = data?.map(item => ({
+      ...item,
+      title: Array.isArray(item.reflectiontopics) && item.reflectiontopics.length > 0 
+        ? item.reflectiontopics[0].title 
+        : "Unknown",
+    }));
     if (error) throw error;
 
-    res.status(200).json({ success: true, data });
+    res.status(200).json({ success: true, data : flattenedData });
   } catch (err: any) {
     console.error("Error fetching reflections with title:", err);
     res.status(500).json({ error: 'Internal server error' });
@@ -407,8 +471,7 @@ export const UpdateReflectionFromStudent = async (
   res: Response
 ) => {
   try {
-    const { id, content } = req.body;
-    const file = req.file;
+    const { id, content, attachmentUrl } = req.body;
 
     // ✅ Validation
     if (!id) return res.status(400).json({ error: "Reflection ID is required" });
@@ -443,20 +506,9 @@ export const UpdateReflectionFromStudent = async (
         .json({ error: "Approved reflections cannot be edited" });
     }
 
-    // ✅ Handle optional file upload
-    let imageUrl: string | undefined;
-    if (file) {
-      const response = await uploadfile(file.path); // expects local path
-      if (response.success && response.url) {
-        imageUrl = response.url;
-      } else {
-        return res.status(400).json({ error: "Invalid image format" });
-      }
-    }
-
     // ✅ Build update payload
     const updatePayload: any = { content, status: "pending" };
-    if (imageUrl) updatePayload.attachment_url = imageUrl;
+    if (attachmentUrl) updatePayload.attachment_url = attachmentUrl;
 
     // ✅ Update reflection
     const { data, error } = await supabase
@@ -554,11 +606,6 @@ console.log("ReflectionDeleting",reflectionId)
       return res.status(400).json({ error: "Reflection ID is required" });
     }
 
-    // Check teacher permission (optional if using middleware)
-    // if (req.user.role !== "teacher") {
-    //   return res.status(403).json({ error: "Forbidden: Only teachers can delete reflections" });
-    // }
-
     // Check if the reflection exists
     const { data: reflection, error: reflectionError } = await supabase
       .from('reflections')
@@ -594,6 +641,121 @@ console.log("ReflectionDeleting",reflectionId)
 
   } catch (err: any) {
     console.error("Error deleting reflection:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Student request to delete reflection (creates moderation request)
+export const requestDeleteReflection = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { reflectionId } = req.params;
+
+    if (!reflectionId) {
+      return res.status(400).json({ error: "Reflection ID is required" });
+    }
+
+    // Fetch student id using auth_user_id
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('id, year_group_id, class_id')
+      .eq('auth_user_id', req.user.userId)
+      .single();
+
+    if (studentError || !student) {
+      return res.status(404).json({ error: 'Student record not found' });
+    }
+
+    // Check if the reflection exists and belongs to the student
+    const { data: reflection, error: reflectionError } = await supabase
+      .from('reflections')
+      .select('*')
+      .eq('id', reflectionId)
+      .eq('student_id', student.id)
+      .single();
+
+    if (reflectionError || !reflection) {
+      return res.status(404).json({ error: "Reflection not found or you don't have permission to delete it" });
+    }
+
+    // Check if reflection is already pending deletion
+    if (reflection.status === 'pending_deletion') {
+      return res.status(400).json({ error: 'Reflection deletion is already pending moderation' });
+    }
+
+    // Update reflection status to pending_deletion
+    const { data: updatedReflection, error: updateError } = await supabase
+      .from('reflections')
+      .update({ status: 'pending_deletion' })
+      .eq('id', reflectionId)
+      .eq('student_id', student.id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Fetch topic title for entity_title
+    const { data: topic, error: topicError } = await supabase
+      .from('reflectiontopics')
+      .select('title')
+      .eq('id', reflection.topic_id)
+      .single();
+
+    if (topicError || !topic) {
+      return res.status(404).json({ error: 'Topic not found' });
+    }
+
+    // Create moderation request for deletion
+    const moderationData = {
+      entity_type: 'reflection',
+      action_type: 'delete',
+      entity_id: reflectionId,
+      student_id: student.id,
+      year_group_id: student.year_group_id,
+      class_id: student.class_id,
+      entity_title: topic.title,
+      old_content: reflection,
+      status: 'pending'
+    };
+
+    const { data: moderation, error: moderationError } = await supabase
+      .from('moderations')
+      .insert(moderationData)
+      .select()
+      .single();
+
+    if (moderationError) throw moderationError;
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Your request to delete this reflection has been sent for moderation and will be reviewed by your teacher.',
+      data: { updatedReflection, moderation }
+    });
+
+  } catch (err: any) {
+    console.error("Error requesting reflection deletion:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Get previous weeks for a user
+export const getPreviousWeeksForUser = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Get the current academic week
+    const currentWeek = calculateAcademicWeek();
+    
+    // Get previous weeks using the utility function
+    const previousWeeks = getPreviousWeeks(currentWeek);
+    
+    res.status(200).json({ 
+      success: true, 
+      data: {
+        currentWeek,
+        previousWeeks,
+        totalPreviousWeeks: previousWeeks.length
+      }
+    });
+  } catch (err: any) {
+    console.error("Error getting previous weeks:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };

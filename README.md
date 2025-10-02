@@ -1,5 +1,5 @@
 # School Portal Backend API
- 
+  
 A comprehensive backend system for a UK primary school portal built with Node.js, TypeScript, Express, and Supabase (PostgreSQL).
 
 ## Features 
