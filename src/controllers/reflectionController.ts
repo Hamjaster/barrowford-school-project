@@ -157,12 +157,17 @@ export const fetchActiveTopics = async (req: AuthenticatedRequest, res: Response
     // 1. Get student ID from auth_user_id
     const { data: student, error: studentError } = await supabase
       .from("students")
-      .select("id")
+      .select("id, status")
       .eq("auth_user_id", req.user.userId)
       .single();
 
     if (studentError || !student) {
       return res.status(404).json({ error: "Student record not found" });
+    }
+    
+    // Check if student is active
+    if (student.status && student.status !== 'active') {
+      return res.status(403).json({ error: 'Student account is inactive' });
     }
 
     // 2. Fetch all topic_ids this student already has reflections for
@@ -362,7 +367,7 @@ export const fetchReflectionsByStudentId = async (req: AuthenticatedRequest, res
       status,
       week,
       reflectiontopics!inner(title),
-      reflectioncomments(id,comment,created_at,user_role)
+      reflectioncomments(id,comment,created_at,user_role,user_name)
     `)
     .eq("student_id", studentId)
     .order("created_at", { ascending: false });
@@ -383,12 +388,17 @@ export const fetchStudentReflections = async (req: AuthenticatedRequest, res: Re
        // Find student record
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id')
+      .select('id, status')
       .eq('auth_user_id', req.user.userId)
       .single();
 
     if (studentError || !student) {
       return res.status(404).json({ error: `Student record not found ${student}` });
+    }
+    
+    // Check if student is active
+    if (student.status && student.status !== 'active') {
+      return res.status(403).json({ error: 'Student account is inactive' });
     }
 
   const { data, error } = await supabase
@@ -535,29 +545,32 @@ export const addComment = async(req:AuthenticatedRequest,res:Response)=>{
   if(!reflectionId) return res.status(400).json({error :"Reflection is requird"})
   if(!content) return res.status(400).json({error : 'Comment is Required'})
 
-  // Fetch user id using auth_user_id (UUID from Supabase Auth)
+  // Fetch user id and name using auth_user_id (UUID from Supabase Auth)
   const [staffRes, parentRes] = await Promise.all([
-  supabase.from("staffs").select("id").eq("auth_user_id", req.user.userId).maybeSingle(),
-  supabase.from("parents").select("id").eq("auth_user_id", req.user.userId).maybeSingle(),
+  supabase.from("staffs").select("id, first_name, last_name").eq("auth_user_id", req.user.userId).maybeSingle(),
+  supabase.from("parents").select("id, first_name, last_name").eq("auth_user_id", req.user.userId).maybeSingle(),
     ]);
 
     let user_id: number | null = null;
     let user_role: string | null = null;
+    let user_name: string | null = null;
 
     if (staffRes.data) {
       user_id = staffRes.data.id;
       user_role = "Teacher";
+      user_name = `${staffRes.data.first_name} ${staffRes.data.last_name}`;
     } else if (parentRes.data) {
       user_id = parentRes.data.id;
       user_role = "Parent";
+      user_name = `${parentRes.data.first_name} ${parentRes.data.last_name}`;
     } else {
       return res.status(404).json({ error: "User not found" });
     }
 
     const { data , error } = await supabase
     .from("reflectioncomments")
-    .insert({reflection_id:reflectionId,user_id:user_id,comment:content, user_role:user_role})
-    .select('id,created_at,comment, user_role')
+    .insert({reflection_id:reflectionId,user_id:user_id,comment:content, user_role:user_role, user_name:user_name})
+    .select('id,created_at,comment, user_role, user_name')
     .single()
 
     if(error) throw error;

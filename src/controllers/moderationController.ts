@@ -29,7 +29,13 @@ export const listPendingModerations = async (req: AuthenticatedRequest, res: Res
     let q = supabase
       .from('moderations')
       .select(`
-      *
+      *,
+      student:students!moderations_student_id_fkey (
+        id,
+        first_name,
+        last_name,
+        status
+      )
       `)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
@@ -43,7 +49,18 @@ export const listPendingModerations = async (req: AuthenticatedRequest, res: Res
     const { data, error } = await q;
 
     if (error) throw error;
-    res.json({ success: true, data });
+    
+    // Filter out moderations from inactive students
+    const activeModerations = data?.filter(moderation => {
+      // If student data is available, check if student is active
+      if (moderation.student) {
+        return !moderation.student.status || moderation.student.status === 'active';
+      }
+      // If no student data, include the moderation (fallback)
+      return true;
+    }) || [];
+
+    res.status(200).json({ success: true, data: activeModerations });
   } catch (err) {
     console.error('listPendingModerations error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -55,12 +72,29 @@ export const getModerationById = async (req: AuthenticatedRequest, res: Response
     const { id } = req.params;
     const { data, error } = await supabase
       .from('moderations')
-      .select('*')
+      .select(`
+      *,
+      student:students!moderations_student_id_fkey (
+        id,
+        first_name,
+        last_name,
+        status
+      )
+      `)
       .eq('id', id)
       .single();
 
     if (error) throw error;
-    res.json({ success: true, data });
+    
+    // Check if the moderation is from an active student
+    if (data.student && data.student.status && data.student.status !== 'active') {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Moderation not found or student is inactive' 
+      });
+    }
+    
+    res.status(200).json({ success: true, data });
   } catch (err) {
     console.error('getModerationById error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -86,15 +120,31 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
     const teacher_id = teacherRow.id;
     const modId = req.params.id;
 
-    // fetch moderation
+    // fetch moderation with student info
     const { data: mod, error: modErr } = await supabase
       .from('moderations')
-      .select('*')
+      .select(`
+      *,
+      student:students!moderations_student_id_fkey (
+        id,
+        first_name,
+        last_name,
+        status
+      )
+      `)
       .eq('id', modId)
       .single();
 
     if (modErr || !mod) return res.status(404).json({ success: false, error: 'Moderation not found' });
     if (mod.status !== 'pending') return res.status(400).json({ success: false, error: 'Moderation not pending' });
+    
+    // Check if the moderation is from an active student
+    if (mod.student && mod.student.status && mod.student.status !== 'active') {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Cannot approve moderation from inactive student' 
+      });
+    }
 
     // apply action based on entity_type and action_type
     let applyResult = null;
@@ -300,7 +350,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
     if (modUpdateErr) throw modUpdateErr;
 
 
-    res.json({ success: true, data: applyResult });
+    res.status(200).json({ success: true, data: applyResult });
   } catch (err) {
     console.error('approveModeration error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -323,12 +373,28 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
 
     const { data: mod, error: modErr } = await supabase
       .from('moderations')
-      .select('*')
+      .select(`
+      *,
+      student:students!moderations_student_id_fkey (
+        id,
+        first_name,
+        last_name,
+        status
+      )
+      `)
       .eq('id', modId)
       .single();
 
     if (modErr || !mod) return res.status(404).json({ success: false, error: 'Moderation not found' });
     if (mod.status !== 'pending') return res.status(400).json({ success: false, error: 'Moderation not pending' });
+    
+    // Check if the moderation is from an active student
+    if (mod.student && mod.student.status && mod.student.status !== 'active') {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Cannot reject moderation from inactive student' 
+      });
+    }
 
     // Handle studentimages rejection by updating status
     if (mod.entity_type === 'studentimages') {
@@ -383,7 +449,7 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
 
     if (modUpdateErr) throw modUpdateErr;
 
-    res.json({ success: true, message: 'Moderation rejected' });
+    res.status(200).json({ success: true, message: 'Moderation rejected' });
   } catch (err) {
     console.error('rejectModeration error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });

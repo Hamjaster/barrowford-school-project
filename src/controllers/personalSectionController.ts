@@ -106,7 +106,7 @@ export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res:
       actorRole: req.user.role,
     });
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating personal section topic:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -148,7 +148,7 @@ export const deletePersonalSectionTopic = async (req: AuthenticatedRequest, res:
       actorRole: req.user.role
     });
 
-    res.json({ success: true, message: 'Topic deleted successfully' });
+    res.status(200).json({ success: true, message: 'Topic deleted successfully' });
   } catch (err: any) {
     console.error('Error deleting personal section topic:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -163,7 +163,7 @@ export const getAllPersonalSectionTopics = async (req: Request, res: Response) =
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching personal section topics:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -179,7 +179,7 @@ export const getAllPersonalSectionTopicsForManagement = async (req: Request, res
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching all personal section topics:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -229,7 +229,7 @@ const {status} = req.body;
       actorRole: req.user.role
     });
 
-    res.json({ success: true, message: 'Topic status toggled successfully', data });
+    res.status(200).json({ success: true, message: 'Topic status toggled successfully', data });
   } catch (err: any) {
     console.error('Error toggling personal section topic status:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -357,7 +357,7 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
       actorRole: req.user.role
     });
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating personal section:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -396,7 +396,7 @@ export const getStudentPersonalSections = async (req: AuthenticatedRequest, res:
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching student personal sections:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -438,7 +438,7 @@ export const updatePersonalSectionByTeacher = async (req: AuthenticatedRequest, 
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating personal section:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -471,7 +471,7 @@ export const getMyPersonalSections = async (req: AuthenticatedRequest, res: Resp
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching personal sections:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -509,7 +509,7 @@ export const getMyPersonalSectionByTopic = async (req: AuthenticatedRequest, res
 
     if (error) throw error;
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching personal section by topic:', err);
     res.status(500).json({ error: 'Internal server error' });

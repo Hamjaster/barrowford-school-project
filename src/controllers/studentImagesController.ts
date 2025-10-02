@@ -12,6 +12,7 @@ const getStudentRecord = async (authUserId: string) => {
     .single();
 };
 
+
 // student uploads an image
 export const uploadStudentImage = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -28,6 +29,8 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
       .eq('auth_user_id', req.user.userId)
       .single();
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
+    
+   
 
     // Use provided year_group_id or fall back to student's year_group_id
     const targetYearGroupId = year_group_id || student.year_group_id;
@@ -114,7 +117,7 @@ export const getMyStudentImages = async (req: AuthenticatedRequest, res: Respons
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching student images:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -194,7 +197,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
 
     if (modErr) throw modErr;
 
-    res.json({ success: true, message: 'Deletion submitted for moderation', data: { updatedImage, moderation } });
+    res.status(200).json({ success: true, message: 'Deletion submitted for moderation', data: { updatedImage, moderation } });
   } catch (err) {
     console.error('deleteMyStudentImage error', err);
     res.status(500).json({ success: false, error: 'Internal server error' });
@@ -216,7 +219,7 @@ export const getStudentImagesByTeacher = async (req: AuthenticatedRequest, res: 
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching student images for teacher:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -264,7 +267,7 @@ export const deleteStudentImages = async (req: AuthenticatedRequest, res: Respon
       actorRole: req.user.role
     });
 
-    res.json({ success: true, message: `Student image with ID ${id} deleted successfully` });
+    res.status(200).json({ success: true, message: `Student image with ID ${id} deleted successfully` });
   } catch (err: any) {
     console.error('Error deleting student image by upper-level user:', err);
     res.status(500).json({ error: 'Internal server error' });

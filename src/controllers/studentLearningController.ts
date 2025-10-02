@@ -28,6 +28,8 @@ export const addStudentLearning = async (req: AuthenticatedRequest, res: Respons
       const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
       if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
       
+
+      
       const new_content = {
         student_id: student.id,
         subject_id: subject_id,
@@ -104,7 +106,7 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
         .single();
       if (modErr) throw modErr;
 
-      res.json({ success: true, message: 'Deletion of Learning submitted for moderation', data : moderation });
+      res.status(200).json({ success: true, message: 'Deletion of Learning submitted for moderation', data : moderation });
     } catch (err: any) {
       console.error('Error deleting student learning:', err);
       res.status(500).json({ error: 'Internal server error' });
@@ -121,6 +123,9 @@ export const getMyLearnings = async (req: AuthenticatedRequest, res: Response) =
 
     const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
+    
+    
+    
 // only return learnings for the subject_id if provided
     const { data, error } = await supabase
       .from('studentlearningentities')
@@ -130,7 +135,7 @@ export const getMyLearnings = async (req: AuthenticatedRequest, res: Response) =
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error fetching student learnings:', err);
     res.status(500).json({ error: 'Internal server error' });

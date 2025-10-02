@@ -92,7 +92,7 @@ export const updateImpact = async (req: AuthenticatedRequest, res: Response) => 
       actorRole: req.user.role
     });
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating impact:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -179,7 +179,7 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
       actorRole: req.user.role
     });
 
-    res.json({ success: true, data });
+    res.status(200).json({ success: true, data });
   } catch (err: any) {
     console.error('Error updating experience:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -210,7 +210,7 @@ export const getMyImpacts = async (req: AuthenticatedRequest, res: Response) => 
       .single();
 
     if (error && error.code !== 'PGRST116') throw error; // ignore "no rows found"
-    res.json({ success: true, data: data ? data : "" });
+    res.status(200).json({ success: true, data: data ? data : "" });
   } catch (err: any) {
     console.error('Error fetching impacts:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -241,7 +241,7 @@ export const getMyExperiences = async (req: AuthenticatedRequest, res: Response)
       .single();
 
     if (error && error.code !== 'PGRST116') throw error;
-    res.json({ success: true, data: data ? data : "" });
+    res.status(200).json({ success: true, data: data ? data : "" });
   } catch (err: any) {
     console.error('Error fetching experiences:', err);
     res.status(500).json({ error: 'Internal server error' });
