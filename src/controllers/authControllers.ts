@@ -417,7 +417,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
   const user = await AuthUtils.findUserByEmail(email);
   if (!user) {
-    return res.status(200).json({ success: true, message: 'If an account exists, a reset link has been sent' });
+    return res.status(200).json({ success: true, message: 'A reset link has been sent to that email address' });
   }
 
   if (user.role === 'student') {
