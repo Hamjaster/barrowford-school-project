@@ -94,6 +94,7 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
             email: additionalData.email,
             first_name: additionalData.first_name,
             last_name: additionalData.last_name,
+            profile_photo: additionalData.profile_photo
           })
           .select()
           .single();
@@ -199,8 +200,10 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       role, 
       parent_ids, // an array of parent ids
       year_group_id,
-      class_id
+      class_id,
+      profile_photo
     } = req.body;
+    console.log("req.body",req.body)
     const creatorRole = req.user.role;
     let emailToUse = email;
 
@@ -294,7 +297,7 @@ parentDataList = fetchedParents;
     // Create user directly in role-specific table
     if (authData.user) {
       try {
-        const userData = {
+        const userData: Record<string, any> = {
           first_name,
           last_name,
           email: emailToUse,
@@ -304,7 +307,9 @@ parentDataList = fetchedParents;
           parent_ids,
           username,
         };
-
+        if (profile_photo) {
+          userData.profile_photo = profile_photo;
+        }
         console.log("User data", userData);
 
         const createdUser = await createRoleSpecificEntry( role, userData);
