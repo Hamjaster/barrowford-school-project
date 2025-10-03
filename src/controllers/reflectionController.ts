@@ -221,18 +221,7 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
       return res.status(404).json({ error: 'Student record not found' });
     }
    
-    // Check if the student has already submitted for this topic (whose status can be pending, approved, pending_deletion)
-    const { data: existingReflection, error: existingError } = await supabase
-      .from('reflections')
-      .select('id')
-      .eq('student_id', student.id)
-      .eq('topic_id', topicID)
-      
-      .single()
 
-    if (existingReflection) {
-      return res.status(403).json({ error: 'You have already submitted a reflection for this topic' });
-    }
 
     // Use selected week if provided, otherwise calculate the current academic week
     const weekLabel = selectedWeek || calculateAcademicWeek();
