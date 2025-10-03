@@ -14,6 +14,7 @@ import {
   getStudentImagesByTeacher,
   deleteStudentImages} from '../controllers/studentImagesController.js';
 import { deleteStudentLearning, getMyLearnings, addStudentLearning } from '../controllers/studentLearningController.js';
+import { getStudentDetails } from '../controllers/studentdetailscontroller.js';
 
 const router = Router();
 
@@ -41,4 +42,5 @@ router.delete('/images/:id', authenticateToken,checkPermission("manage_own_image
 router.get('/images/:studentId', authenticateToken,checkPermission("manage_student_images"), getStudentImagesByTeacher as any);
 router.delete('/images/:id', authenticateToken,checkPermission("manage_student_images"), deleteStudentImages as any);
 
+router.get('/details/me', authenticateToken,checkPermission("get_student_details"), getStudentDetails as any);
 export default router;

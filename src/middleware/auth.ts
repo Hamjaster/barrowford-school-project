@@ -40,10 +40,10 @@ const permissions = {
     "delete-reflections",
     "add-comments",
     "fetch-comments",
-     "moderate_content",
-     "get-student-reflections",
-     "view_teacher_profile",
-     "update_student_profile_photo"
+    "moderate_content",
+    "get-student-reflections",
+    "view_teacher_profile",
+    "update_student_profile_photo"
   ],
   parent: [
     "view_children",
@@ -59,8 +59,8 @@ const permissions = {
     "create-reflection",
     "fetch-my-reflections",
     "fetch-comments",
-    "fetch-all-topics"
-
+    "fetch-all-topics",
+    "get_student_details"
   ]
 };
 
@@ -68,24 +68,24 @@ const permissions = {
 export const checkPermission = (requiredPermission: string) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ 
-        success: false, 
-        message: 'Authentication required' 
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required'
       });
       return;
     }
 
     const role = req.user.role;
     const userPermissions = permissions[role as keyof typeof permissions];
-    
+
     if (userPermissions?.includes(requiredPermission)) {
       next();
       return;
     }
 
-    res.status(403).json({ 
-      success: false, 
-      message: `Forbidden: Insufficient permissions. Required permission: ${requiredPermission}` 
+    res.status(403).json({
+      success: false,
+      message: `Forbidden: Insufficient permissions. Required permission: ${requiredPermission}`
     });
   };
 };
@@ -96,30 +96,30 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
     if (!token) {
-      res.status(401).json({ 
-        success: false, 
-        message: 'Access token required' 
+      res.status(401).json({
+        success: false,
+        message: 'Access token required'
       });
       return;
     }
 
     const decoded = AuthUtils.verifyAccessToken(token);
-    
+
     // Check if user exists and is active
     const userProfile = await AuthUtils.findUserByAuthUserId(decoded.userId);
     if (!userProfile) {
-      res.status(404).json({ 
-        success: false, 
-        message: 'User profile not found' 
+      res.status(404).json({
+        success: false,
+        message: 'User profile not found'
       });
       return;
     }
 
     // Check if user is active
     if (userProfile.status && userProfile.status !== 'active') {
-      res.status(403).json({ 
-        success: false, 
-        message: 'Account is inactive. Please contact an administrator.' 
+      res.status(403).json({
+        success: false,
+        message: 'Account is inactive. Please contact an administrator.'
       });
       return;
     }
@@ -127,9 +127,9 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     req.user = decoded;
     next();
   } catch (error) {
-    res.status(403).json({ 
-      success: false, 
-      message: 'Invalid or expired token' 
+    res.status(403).json({
+      success: false,
+      message: 'Invalid or expired token'
     });
   }
 };
@@ -138,17 +138,17 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 export const requireRole = (allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ 
-        success: false, 
-        message: 'Authentication required' 
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required'
       });
       return;
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      res.status(403).json({ 
-        success: false, 
-        message: 'Insufficient permissions' 
+      res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions'
       });
       return;
     }
@@ -161,9 +161,9 @@ export const requireRole = (allowedRoles: string[]) => {
 export const canAccessStudentData = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (!req.user) {
-      res.status(401).json({ 
-        success: false, 
-        message: 'Authentication required' 
+      res.status(401).json({
+        success: false,
+        message: 'Authentication required'
       });
       return;
     }
@@ -188,9 +188,9 @@ export const canAccessStudentData = async (req: Request, res: Response, next: Ne
     // Students can only access their own data
     if (role === 'student') {
       if (userId !== studentId) {
-        res.status(403).json({ 
-          success: false, 
-          message: 'Access denied: Can only access own data' 
+        res.status(403).json({
+          success: false,
+          message: 'Access denied: Can only access own data'
         });
         return;
       }
@@ -198,9 +198,9 @@ export const canAccessStudentData = async (req: Request, res: Response, next: Ne
 
     next();
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error checking access permissions' 
+    res.status(500).json({
+      success: false,
+      message: 'Error checking access permissions'
     });
   }
 };
