@@ -370,7 +370,12 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
     if (!teacherRow) return res.status(403).json({ success: false, error: 'Teacher record not found' });
     const modId = req.params.id;
     const { reason } = req.body;
-
+    if (!reason || reason.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        error: "Rejection reason is required.",
+      });
+    }
     const { data: mod, error: modErr } = await supabase
       .from('moderations')
       .select(`

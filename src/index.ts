@@ -31,16 +31,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
 
-// Rate limiting
-// const limiter = rateLimit({
-//   windowMs: Number(config.rateLimit.windowMs) || 15 * 60 * 1000, // default to 15 minutes if not set
-//   max: Number(config.rateLimit.max) || 100, // default to 100 requests per window if not set
-//   message: {
-//     success: false,
-//     message: 'Too many requests from this IP, please try again later.',
-//   },
-// });
-// app.use('/api/', limiter);
 
 // Logging
 if (config.nodeEnv === 'development') {

@@ -3,11 +3,8 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
-  port: parseInt(process.env.PORT || '3000'),
-  nodeEnv: process.env.NODE_ENV || 'development',
-  
-  // Database
-  databaseUrl: process.env.DATABASE_URL!,
+  port: parseInt(process.env.PORT !),
+  nodeEnv: process.env.NODE_ENV ,
   
   // Supabase
   supabase: {
@@ -18,29 +15,24 @@ export const config = {
   
   // JWT
   jwt: {
-    secret: process.env.JWT_SECRET || 'fallback-secret-key',
-    expiresIn: process.env.JWT_EXPIRES_IN || '100h',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret',
-    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    secret: process.env.JWT_SECRET ,
+    expiresIn: process.env.JWT_EXPIRES_IN ,
+    refreshSecret: process.env.JWT_REFRESH_SECRET ,
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ,
   },
   
   // Email
   email: {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
+    host: process.env.SMTP_HOST ,
+    port: parseInt(process.env.SMTP_PORT!),
     user: process.env.SMTP_USER!,
     pass: process.env.SMTP_PASS!,
-    from: process.env.EMAIL_FROM || 'noreply@school-portal.com',
+    from: process.env.EMAIL_FROM ,
   },
   
   // URLs
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  frontendUrl: process.env.FRONTEND_URL ,
   
-  // Rate limiting
-  rateLimit: {
-    windowMs: process.env.RATE_LIMIT_WINDOW_MS, // 15 minutes
-    max: process.env.RATE_LIMIT_MAX, // limit each IP to 100 requests per windowMs
-  },
   
   // Password reset
   passwordReset: {
