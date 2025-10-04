@@ -37,7 +37,7 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
 
     // Fetch year group name for entity_title
     const { data: yearGroup, error: yearGroupError } = await supabase
-      .from('yeargroups')
+      .from('year_groups')
       .select('name')
       .eq('id', targetYearGroupId)
       .single();
@@ -46,9 +46,9 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
       return res.status(404).json({ error: 'Year group not found' });
     }
 
-    // Create studentimages record with pending status
+    // Create student_images record with pending status
     const { data: studentImage, error: imageErr } = await supabase
-      .from('studentimages')
+      .from('student_images')
       .insert({
         student_id: student.id,
         year_group_id: targetYearGroupId,
@@ -71,7 +71,7 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
       .from('moderations')
       .insert({
         student_id: student.id,
-        entity_type: 'studentimages',
+        entity_type: 'student_images',
         year_group_id: targetYearGroupId,
         class_id: student.class_id,
         entity_id: studentImage.id,
@@ -97,7 +97,7 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
 
 
 // student gets own images
-export const getMyStudentImages = async (req: AuthenticatedRequest, res: Response) => {
+export const getMystudent_images = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { year_group_id } = req.query;
 
@@ -105,7 +105,7 @@ export const getMyStudentImages = async (req: AuthenticatedRequest, res: Respons
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
 
     let query = supabase
-      .from('studentimages')
+      .from('student_images')
       .select('id, image_url, created_at, status')
       .eq('student_id', student.id);
 
@@ -140,7 +140,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
 
     // fetch current image row to store old_content
     const { data: imageRow, error: imageErr } = await supabase
-      .from('studentimages')
+      .from('student_images')
       .select('*')
       .eq('id', id)
       .eq('student_id', studentRow.id)
@@ -155,7 +155,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
 
     // Update image status to pending_deletion
     const { data: updatedImage, error: updateErr } = await supabase
-      .from('studentimages')
+      .from('student_images')
       .update({ status: 'pending_deletion' })
       .eq('id', id)
       .eq('student_id', studentRow.id)
@@ -166,7 +166,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
 
     // Fetch year group name for entity_title
     const { data: yearGroup, error: yearGroupError } = await supabase
-      .from('yeargroups')
+      .from('year_groups')
       .select('name')
       .eq('id', imageRow.year_group_id)
       .single();
@@ -182,7 +182,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
         student_id: studentRow.id,
         year_group_id: studentRow.year_group_id,
         class_id: studentRow.class_id,
-        entity_type: 'studentimages',
+        entity_type: 'student_images',
         entity_id: id,
         entity_title: `My Images (${yearGroup.name})`,
         old_content: imageRow,
@@ -206,14 +206,14 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
 
 
 // teacher views images of a specific student
-export const getStudentImagesByTeacher = async (req: AuthenticatedRequest, res: Response) => {
+export const getstudent_imagesByTeacher = async (req: AuthenticatedRequest, res: Response) => {
   try {
  
 
     const { studentId } = req.params;
 
     const { data, error } = await supabase
-      .from('studentimages')
+      .from('student_images')
       .select('id, image_url, created_at, status')
       .eq('student_id', studentId)
       .order('created_at', { ascending: false });
@@ -227,7 +227,7 @@ export const getStudentImagesByTeacher = async (req: AuthenticatedRequest, res: 
 };
 
 // upper-level user deletes student image
-export const deleteStudentImages = async (req: AuthenticatedRequest, res: Response) => {
+export const deletestudent_images = async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!['admin', 'staff_admin', 'staff'].includes(req.user.role)) {
       return res.status(403).json({ error: 'Only upper-level users can delete student images' });
@@ -237,7 +237,7 @@ export const deleteStudentImages = async (req: AuthenticatedRequest, res: Respon
 
     // Get old value for audit log
     const { data: oldData, error: oldError } = await supabase
-      .from('studentimages')
+      .from('student_images')
       .select('*')
       .eq('id', id)
       .single();
@@ -246,7 +246,7 @@ export const deleteStudentImages = async (req: AuthenticatedRequest, res: Respon
 
     // Actually delete the record
     const { error: deleteError } = await supabase
-      .from('studentimages')
+      .from('student_images')
       .delete()
       .eq('id', id);
 
@@ -259,7 +259,7 @@ export const deleteStudentImages = async (req: AuthenticatedRequest, res: Respon
     // Log audit for delete action
     await logAudit({
       action: 'delete',
-      entityType: 'studentimages',
+      entityType: 'student_images',
       entityId: id,
       oldValue: oldData,
       newValue: null,

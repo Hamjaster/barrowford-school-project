@@ -24,7 +24,7 @@ export const createReflectioTopic = async (req:AuthenticatedRequest,res : Respon
         }
 
         const { data, error } = await supabase
-        .from("reflectiontopics")
+        .from("reflection_topics")
         .insert([{ title, created_by: staff.id }]) 
         .select()
         .single();
@@ -42,7 +42,7 @@ export const fetchAllTopics = async (req: AuthenticatedRequest, res: Response) =
     try {
         // Fetch all reflection topics
         const { data, error } = await supabase
-            .from("reflectiontopics")
+            .from("reflection_topics")
             .select("*")
             .order('created_at', { ascending: false });
 
@@ -76,7 +76,7 @@ export const updateTopic = async (req: AuthenticatedRequest, res: Response) => {
 
         // Update the topic
         const { data, error } = await supabase
-            .from("reflectiontopics")
+            .from("reflection_topics")
             .update(updateData)
             .eq("id", id)
             .select()
@@ -106,7 +106,7 @@ export const deleteTopic = async (req: AuthenticatedRequest, res: Response) => {
 
         // Check if topic exists and get info before deletion
         const { data: existingTopic, error: fetchError } = await supabase
-            .from("reflectiontopics")
+            .from("reflection_topics")
             .select("id, title")
             .eq("id", id)
             .single();
@@ -135,7 +135,7 @@ export const deleteTopic = async (req: AuthenticatedRequest, res: Response) => {
 
         // Delete the topic
         const { error: deleteError } = await supabase
-            .from("reflectiontopics")
+            .from("reflection_topics")
             .delete()
             .eq("id", id);
 
@@ -185,7 +185,7 @@ export const fetchActiveTopics = async (req: AuthenticatedRequest, res: Response
 
     // 3. Fetch active topics excluding the ones student already reflected on
     const { data, error } = await supabase
-      .from("reflectiontopics")
+      .from("reflection_topics")
       .select("id, title")
       .eq("is_active", true)
       .not("id", "in", `(${reflectedTopicIds.join(",") || "NULL"})`);
@@ -244,7 +244,7 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
 
     // Fetch topic title for entity_title
     const { data: topic, error: topicError } = await supabase
-      .from('reflectiontopics')
+      .from('reflection_topics')
       .select('title')
       .eq('id', topicID)
       .single();
@@ -324,7 +324,7 @@ export const fetchAllReflectionsWithTitle = async (req: AuthenticatedRequest, re
         created_at,
         topic_id,
         status,
-        reflectiontopics!inner(title)
+        reflection_topics!inner(title)
       `)
       .order('created_at', { ascending: false });
 
@@ -355,8 +355,8 @@ export const fetchReflectionsByStudentId = async (req: AuthenticatedRequest, res
       topic_id,
       status,
       week,
-      reflectiontopics!inner(title),
-      reflectioncomments(id,comment,created_at,user_role,user_name)
+      reflection_topics!inner(title),
+      reflection_comments(id,comment,created_at,user_role,user_name)
     `)
     .eq("student_id", studentId)
     .order("created_at", { ascending: false });
@@ -401,15 +401,15 @@ export const fetchStudentReflections = async (req: AuthenticatedRequest, res: Re
       topic_id,
       status,
       week,
-      reflectiontopics!inner(title)
+      reflection_topics!inner(title)
     `)
     .eq("student_id", student.id)
     .order("created_at", { ascending: false });
 
     const flattenedData = data?.map(item => ({
       ...item,
-      title: Array.isArray(item.reflectiontopics) && item.reflectiontopics.length > 0 
-        ? item.reflectiontopics[0].title 
+      title: Array.isArray(item.reflection_topics) && item.reflection_topics.length > 0 
+        ? item.reflection_topics[0].title 
         : "Unknown",
     }));
     if (error) throw error;
@@ -445,7 +445,7 @@ export const UpdateReflection = async (req: AuthenticatedRequest, res: Response)
         created_at,
         topic_id,
         status,
-        reflectiontopics!inner(title)
+        reflection_topics!inner(title)
       `)
       .single();
 
@@ -557,7 +557,7 @@ export const addComment = async(req:AuthenticatedRequest,res:Response)=>{
     }
 
     const { data , error } = await supabase
-    .from("reflectioncomments")
+    .from("reflection_comments")
     .insert({reflection_id:reflectionId,user_id:user_id,comment:content, user_role:user_role, user_name:user_name})
     .select('id,created_at,comment, user_role, user_name')
     .single()
@@ -585,7 +585,7 @@ export const fetchComments = async (req: AuthenticatedRequest, res: Response) =>
 
 
     const { data, error } = await supabase
-      .from("reflectioncomments")
+      .from("reflection_comments")
       .select('*')
       .eq("reflection_id", reflectionId)
       .order("created_at", { ascending: false });
@@ -621,7 +621,7 @@ console.log("ReflectionDeleting",reflectionId)
 
     // Delete all comments associated with this reflection
     const { error: deleteCommentsError } = await supabase
-      .from('reflectioncomments')
+      .from('reflection_comments')
       .delete()
       .eq('reflection_id', reflectionId);
 
@@ -697,7 +697,7 @@ export const requestDeleteReflection = async (req: AuthenticatedRequest, res: Re
 
     // Fetch topic title for entity_title
     const { data: topic, error: topicError } = await supabase
-      .from('reflectiontopics')
+      .from('reflection_topics')
       .select('title')
       .eq('id', reflection.topic_id)
       .single();

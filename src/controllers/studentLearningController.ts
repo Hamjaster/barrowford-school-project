@@ -44,7 +44,7 @@ export const addStudentLearning = async (req: AuthenticatedRequest, res: Respons
           student_id: student.id,
           year_group_id: student.year_group_id,
           class_id: student.class_id,
-          entity_type: 'studentlearningentities',
+          entity_type: 'student_learning_entities',
           entity_id: null,
           entity_title: title, // Use the title directly as entity_title
           old_content: null,
@@ -78,7 +78,7 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
 
       // fetch learning row to store old_content
       const { data: learningRow, error: learningErr } = await supabase
-        .from('studentlearningentities')
+        .from('student_learning_entities')
         .select('*')
         .eq('id', id)
         .eq('student_id', student.id)
@@ -93,7 +93,7 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
           student_id: student.id,
           year_group_id: student.year_group_id,
           class_id: student.class_id,
-          entity_type: 'studentlearningentities',
+          entity_type: 'student_learning_entities',
           entity_id: id,
           entity_title: learningRow.title, // Use the title from the learning row
           old_content: learningRow,
@@ -128,7 +128,7 @@ export const getMyLearnings = async (req: AuthenticatedRequest, res: Response) =
     
 // only return learnings for the subject_id if provided
     const { data, error } = await supabase
-      .from('studentlearningentities')
+      .from('student_learning_entities')
       .select('id, subject_id, title, description, attachment_url, created_at')
       .eq('student_id', student.id)
       .eq('subject_id', subject_id)
