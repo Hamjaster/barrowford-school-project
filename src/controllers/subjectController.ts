@@ -193,10 +193,10 @@ const {status} = req.body;
 };
 
 // Get all year groups
-export const getAllYearGroups = async (req: Request, res: Response) => {
+export const getAllyear_groups = async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
-      .from('yeargroups')
+      .from('year_groups')
       .select('*')
       .order('created_at', { ascending: false });
 

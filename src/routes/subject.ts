@@ -6,7 +6,7 @@ import {
   deleteSubject,
   getAllSubjects,
   toggleSubjectStatus,
-  getAllYearGroups,
+  getAllyear_groups,
   getSubjectsByYearGroup
 } from '../controllers/subjectController.js';
 
@@ -20,7 +20,7 @@ router.get('/', getAllSubjects);
 router.patch('/status/:id', authenticateToken, checkPermission('manage_users'), toggleSubjectStatus as any);
 
 // Year groups and subjects by year group routes
-router.get('/year-groups', getAllYearGroups);
+router.get('/year-groups', getAllyear_groups);
 router.get('/year-groups/:yearGroupId/subjects', getSubjectsByYearGroup);
 
 export default router;

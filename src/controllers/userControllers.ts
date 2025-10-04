@@ -137,6 +137,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
 export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { action, role, userId } = req.body; // 'activate' | 'deactivate'
+    
     console.log(role, userId, 'params')
     if (!['activate', 'deactivate'].includes(action)) {
       return res.status(400).json({ error: 'Invalid action' });
@@ -177,8 +178,8 @@ export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response)
       actorRole: req.user.role
     });
 
-    res.status(200).json({ success: true, message: `${role} ${action}d successfully` });
-  } catch (err: any) {
+    const capitalizedRole = role.charAt(0).toUpperCase() + role.slice(1);
+    res.status(200).json({ success: true, message: `${capitalizedRole} ${action}d successfully` });  } catch (err: any) {
     console.error('Error toggling status:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
