@@ -9,11 +9,12 @@ import {
 } from '../controllers/studentPagesController.js';
 import {
   uploadStudentImage,
-  getMyStudentImages,
+  getMystudent_images,
   deleteMyStudentImage,
-  getStudentImagesByTeacher,
-  deleteStudentImages} from '../controllers/studentImagesController.js';
+  getstudent_imagesByTeacher,
+  deletestudent_images} from '../controllers/studentImagesController.js';
 import { deleteStudentLearning, getMyLearnings, addStudentLearning } from '../controllers/studentLearningController.js';
+import { getStudentDetails } from '../controllers/studentdetailscontroller.js';
 
 const router = Router();
 
@@ -34,11 +35,12 @@ router.post('/learning/me', authenticateToken, checkPermission("manage_student_p
 
 // images
 router.post('/images', authenticateToken,checkPermission("manage_own_images"), uploadStudentImage as any);
-router.get('/images/me', authenticateToken,checkPermission("manage_own_images"), getMyStudentImages as any);
+router.get('/images/me', authenticateToken,checkPermission("manage_own_images"), getMystudent_images as any);
 router.delete('/images/:id', authenticateToken,checkPermission("manage_own_images"), deleteMyStudentImage as any);
 
 // upper level access
-router.get('/images/:studentId', authenticateToken,checkPermission("manage_student_images"), getStudentImagesByTeacher as any);
-router.delete('/images/:id', authenticateToken,checkPermission("manage_student_images"), deleteStudentImages as any);
+router.get('/images/:studentId', authenticateToken,checkPermission("manage_student_images"), getstudent_imagesByTeacher as any);
+router.delete('/images/:id', authenticateToken,checkPermission("manage_student_images"), deletestudent_images as any);
 
+router.get('/details/me', authenticateToken,checkPermission("get_student_details"), getStudentDetails as any);
 export default router;

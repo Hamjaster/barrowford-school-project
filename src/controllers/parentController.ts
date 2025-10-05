@@ -18,7 +18,7 @@ export const getMyChildren = async (req: AuthenticatedRequest, res: Response) =>
 
     // Find all children (students) linked with this parent - only active students
     const { data: children, error: childrenError } = await supabase
-      .from('parentstudentrelationship')
+      .from('parent_student_relationship')
       .select(`
         student:students (id, first_name, last_name, username, year_group_id, class_id, created_at, status)
       `)
@@ -54,7 +54,7 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
     if (parentError || !parent) return res.status(404).json({ error: 'Parent record not found' });
 
     const { data: relation, error: relationError } = await supabase
-      .from('parentstudentrelationship')
+      .from('parent_student_relationship')
       .select('id')
       .eq('parent_id', parent.id)
       .eq('student_id', studentId)
@@ -82,7 +82,7 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
 
     // Fetch learnings with subject information
     const { data: learnings } = await supabase
-      .from('studentlearningentities')
+      .from('student_learning_entities')
       .select(`
         id, 
         title, 
@@ -95,10 +95,10 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
       .eq('student_id', studentId);
 
     // Fetch images
-    // the studentimages has year_group_id, I want to return the name of year group along with in the response
+    // the student_images has year_group_id, I want to return the name of year group along with in the response
 
     const { data: images } = await supabase
-      .from('studentimages')
+      .from('student_images')
       .select('id, image_url, created_at,yeargroup:year_group_id ( name )')
       .eq('status', 'approved')
       .eq('student_id', studentId);
@@ -117,8 +117,8 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
         topic_id,
         status,
         week,
-        reflectiontopics!inner(title),
-        reflectioncomments(id,comment,created_at,user_role,user_name)
+        reflection_topics!inner(title),
+        reflection_comments(id,comment,created_at,user_role,user_name)
         `
       )
       .eq('status', 'approved')

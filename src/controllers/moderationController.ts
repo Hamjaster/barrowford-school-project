@@ -149,11 +149,11 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
     // apply action based on entity_type and action_type
     let applyResult = null;
 
-    if (mod.entity_type === 'studentimages') {
+    if (mod.entity_type === 'student_images') {
       if (mod.action_type === 'create') {
-        // Update existing studentimages record status to 'approved'
+        // Update existing student_images record status to 'approved'
         const { data: updated, error: updateErr } = await supabase
-          .from('studentimages')
+          .from('student_images')
           .update({ status: 'approved' })
           .eq('id', mod.entity_id)
           .select()
@@ -165,7 +165,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
         // Log audit for create action
         await logAudit({
           action: 'create',
-          entityType: 'studentimages',
+          entityType: 'student_images',
           entityId: mod.entity_id,
           oldValue: { ...mod.new_content, status: 'pending' },
           newValue: updated,
@@ -175,7 +175,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
       } else if (mod.action_type === 'update') {
         const updatePayload = mod.new_content;
         const { data: updated, error: updateErr } = await supabase
-          .from('studentimages')
+          .from('student_images')
           .update(updatePayload)
           .eq('id', mod.entity_id)
           .select()
@@ -187,7 +187,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
         // Log audit for update action
         await logAudit({
           action: 'update',
-          entityType: 'studentimages',
+          entityType: 'student_images',
           entityId: mod.entity_id,
           oldValue: mod.old_content,
           newValue: updated,
@@ -197,7 +197,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
       } else if (mod.action_type === 'delete') {
         // Actually delete the record when deletion is approved
         const { error: delErr } = await supabase
-          .from('studentimages')
+          .from('student_images')
           .delete()
           .eq('id', mod.entity_id);
 
@@ -207,7 +207,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
         // Log audit for delete action
         await logAudit({
           action: 'delete',
-          entityType: 'studentimages',
+          entityType: 'student_images',
           entityId: mod.entity_id,
           oldValue: mod.old_content,
           newValue: null,
@@ -262,7 +262,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
       } else if (mod.action_type === 'delete') {
         // Delete all comments associated with this reflection first
         const { error: deleteCommentsError } = await supabase
-          .from('reflectioncomments')
+          .from('reflection_comments')
           .delete()
           .eq('reflection_id', mod.entity_id);
 
@@ -289,12 +289,12 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
           actorRole: 'student'
         });
       }
-    } else if (mod.entity_type === 'studentlearningentities') {
-      // map to studentlearningentities
+    } else if (mod.entity_type === 'student_learning_entities') {
+      // map to student_learning_entities
       if (mod.action_type === 'create') {
         const insertPayload = mod.new_content;
         const { data: inserted, error: insertErr } = await supabase
-          .from('studentlearningentities')
+          .from('student_learning_entities')
           .insert(insertPayload)
           .select()
           .single();
@@ -304,7 +304,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
         // Log audit for create action
         await logAudit({
           action: 'create',
-          entityType: 'studentlearningentities',
+          entityType: 'student_learning_entities',
           entityId: inserted.id,
           oldValue: null,
           newValue: inserted,
@@ -313,7 +313,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
         });
       } else if (mod.action_type === 'delete') {
         const { error: delErr } = await supabase
-          .from('studentlearningentities')
+          .from('student_learning_entities')
           .delete()
           .eq('id', mod.entity_id);
         if (delErr) throw delErr;
@@ -322,7 +322,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
         // Log audit for delete action
         await logAudit({
           action: 'delete',
-          entityType: 'studentlearningentities',
+          entityType: 'student_learning_entities',
           entityId: mod.entity_id,
           oldValue: mod.old_content,
           newValue: null,
@@ -370,7 +370,13 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
     if (!teacherRow) return res.status(403).json({ success: false, error: 'Teacher record not found' });
     const modId = req.params.id;
     const { reason } = req.body;
-
+   
+    if (!reason || reason.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        error: "Rejection reason is required.",
+      });
+    }
     const { data: mod, error: modErr } = await supabase
       .from('moderations')
       .select(`
@@ -396,12 +402,12 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
       });
     }
 
-    // Handle studentimages rejection by updating status
-    if (mod.entity_type === 'studentimages') {
+    // Handle student_images rejection by updating status
+    if (mod.entity_type === 'student_images') {
       if (mod.action_type === 'create') {
         // Rejecting creation - update status to 'rejected'
         const { error: imageUpdateErr } = await supabase
-          .from('studentimages')
+          .from('student_images')
           .update({ status: 'rejected' })
           .eq('id', mod.entity_id);
 
@@ -409,7 +415,7 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
       } else if (mod.action_type === 'delete') {
         // Rejecting deletion - revert status back to 'approved'
         const { error: imageUpdateErr } = await supabase
-          .from('studentimages')
+          .from('student_images')
           .update({ status: 'approved' })
           .eq('id', mod.entity_id);
 

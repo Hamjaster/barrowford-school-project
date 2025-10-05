@@ -13,12 +13,22 @@ const getStudentRecord = async (authUserId: string) => {
 // FOR MANAGERS (admin, staff, staff_admin)
 export const createPersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { title } = req.body;
+    const { title, description } = req.body;
+    
     if (!title) return res.status(400).json({ error: 'Title is required' });
 
+    // Build the insert data dynamically
+    const insertData: Record<string, any> = { 
+      title, 
+      status: 'active' 
+    };
+    if (description?.trim()) {
+      insertData.description = description.trim();
+    }
+
     const { data, error } = await supabase
-      .from('personalsectiontopics')
-      .insert({ title, status: 'active' })
+      .from('personal_section_topics')
+      .insert(insertData)
       .select()
       .single();
 
@@ -31,7 +41,7 @@ export const createPersonalSectionTopic = async (req: AuthenticatedRequest, res:
     // Log audit for create action
     await logAudit({
       action: 'create',
-      entityType: 'personalsectiontopics',
+      entityType: 'personal_section_topics',
       entityId: data.id,
       oldValue: null,
       newValue: data,
@@ -45,23 +55,36 @@ export const createPersonalSectionTopic = async (req: AuthenticatedRequest, res:
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
+
 export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { title } = req.body;
+    const { title, description } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
 
     // Get old value for audit log
     const { data: oldData, error: oldError } = await supabase
-      .from('personalsectiontopics')
+      .from('personal_section_topics')
       .select('*')
       .eq('id', id)
       .single();
 
     if (oldError) throw oldError;
 
+    // Build update object dynamically
+    const updateFields: Record<string, any> = { title };
+    if (description !== undefined) {
+      updateFields.description = description; // can be empty or updated text
+    }
+
     const { data, error } = await supabase
-      .from('personalsectiontopics')
-      .update({ title })
+      .from('personal_section_topics')
+      .update(updateFields)
       .eq('id', id)
       .select()
       .single();
@@ -75,12 +98,12 @@ export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res:
     // Log audit for update action
     await logAudit({
       action: 'update',
-      entityType: 'personalsectiontopics',
+      entityType: 'personal_section_topics',
       entityId: id,
       oldValue: oldData,
       newValue: data,
       actorId: user.id,
-      actorRole: req.user.role
+      actorRole: req.user.role,
     });
 
     res.status(200).json({ success: true, data });
@@ -89,13 +112,14 @@ export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res:
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
 export const deletePersonalSectionTopic = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
 
     // Get old value for audit log
     const { data: oldData, error: oldError } = await supabase
-      .from('personalsectiontopics')
+      .from('personal_section_topics')
       .select('*')
       .eq('id', id)
       .single();
@@ -103,7 +127,7 @@ export const deletePersonalSectionTopic = async (req: AuthenticatedRequest, res:
     if (oldError) throw oldError;
 
     const { error } = await supabase
-      .from('personalsectiontopics')
+      .from('personal_section_topics')
       .delete()
       .eq('id', id);
 
@@ -116,7 +140,7 @@ export const deletePersonalSectionTopic = async (req: AuthenticatedRequest, res:
     // Log audit for delete action
     await logAudit({
       action: 'delete',
-      entityType: 'personalsectiontopics',
+      entityType: 'personal_section_topics',
       entityId: id,
       oldValue: oldData,
       newValue: null,
@@ -130,10 +154,10 @@ export const deletePersonalSectionTopic = async (req: AuthenticatedRequest, res:
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-export const getAllPersonalSectionTopics = async (req: Request, res: Response) => {
+export const getAllpersonal_section_topics = async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
-      .from('personalsectiontopics')
+      .from('personal_section_topics')
       .select('*')
       .eq('status', 'active') // Only return active topics
       .order('created_at', { ascending: false });
@@ -147,10 +171,10 @@ export const getAllPersonalSectionTopics = async (req: Request, res: Response) =
 };
 
 // Get all personal section topics (including inactive) - for staff management
-export const getAllPersonalSectionTopicsForManagement = async (req: Request, res: Response) => {
+export const getAllpersonal_section_topicsForManagement = async (req: Request, res: Response) => {
   try {
     const { data, error } = await supabase
-      .from('personalsectiontopics')
+      .from('personal_section_topics')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -163,7 +187,7 @@ export const getAllPersonalSectionTopicsForManagement = async (req: Request, res
 };
 
 // Activate personal section topic
-export const togglePersonalSectionTopicStatus = async (req: AuthenticatedRequest, res: Response) => {
+export const togglepersonal_section_topicstatus = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
 const {status} = req.body;
@@ -174,7 +198,7 @@ const {status} = req.body;
 
     // Get old value for audit log
     const { data: oldData, error: oldError } = await supabase
-      .from('personalsectiontopics')
+      .from('personal_section_topics')
       .select('*')
       .eq('id', id)
       .single();
@@ -182,7 +206,7 @@ const {status} = req.body;
     if (oldError) throw oldError;
 
     const { data, error } = await supabase
-      .from('personalsectiontopics')
+      .from('personal_section_topics')
       .update({ status })
       .eq('id', id)
       .select()
@@ -197,7 +221,7 @@ const {status} = req.body;
     // Log audit for status change
     await logAudit({
       action: 'update',
-      entityType: 'personalsectiontopics',
+      entityType: 'personal_section_topics',
       entityId: id,
       oldValue: oldData,
       newValue: data,
@@ -236,7 +260,7 @@ export const createPersonalSection = async (req: AuthenticatedRequest, res: Resp
 
     // Check if personal section already exists for this student and topic
     const { data: existingSection, error: existingError } = await supabase
-      .from('personalsections')
+      .from('personal_sections')
       .select('id')
       .eq('student_id', student.id)
       .eq('topic_id', topic_id)
@@ -252,7 +276,7 @@ export const createPersonalSection = async (req: AuthenticatedRequest, res: Resp
     }
 
     const { data, error } = await supabase
-      .from('personalsections')
+      .from('personal_sections')
       .insert({ student_id: student.id, topic_id, content })
       .select()
       .single();
@@ -266,7 +290,7 @@ export const createPersonalSection = async (req: AuthenticatedRequest, res: Resp
     // Log audit for create action
     await logAudit({
       action: 'create',
-      entityType: 'personalsections',
+      entityType: 'personal_sections',
       entityId: data.id,
       oldValue: null,
       newValue: data,
@@ -300,7 +324,7 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
 
     // Get old value for audit log
     const { data: oldData, error: oldError } = await supabase
-      .from('personalsections')
+      .from('personal_sections')
       .select('*')
       .eq('id', id)
       .eq('student_id', student.id)
@@ -309,7 +333,7 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
     if (oldError) throw oldError;
 
     const { data, error } = await supabase
-      .from('personalsections')
+      .from('personal_sections')
       .update({ content })
       .eq('id', id)
       .eq('student_id', student.id)
@@ -325,7 +349,7 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
     // Log audit for update action
     await logAudit({
       action: 'update',
-      entityType: 'personalsections',
+      entityType: 'personal_sections',
       entityId: id,
       oldValue: oldData,
       newValue: data,
@@ -339,7 +363,7 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
     res.status(500).json({ error: 'Internal server error' });
   }
 };
-export const getStudentPersonalSections = async (req: AuthenticatedRequest, res: Response) => {
+export const getStudentpersonal_sections = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { studentId } = req.params;
 
@@ -360,12 +384,12 @@ export const getStudentPersonalSections = async (req: AuthenticatedRequest, res:
 
     // Get the student's personal sections
     const { data, error } = await supabase
-      .from('personalsections')
+      .from('personal_sections')
       .select(`
         id,
         content,
         created_at,
-        topic:personalsectiontopics (id, title)
+        topic:personal_section_topics (id, title)
       `)
       .eq('student_id', studentId)
       .order('created_at', { ascending: false });
@@ -390,7 +414,7 @@ export const updatePersonalSectionByTeacher = async (req: AuthenticatedRequest, 
 
     // Verify the personal section exists
     const { data: existingSection, error: existingError } = await supabase
-      .from('personalsections')
+      .from('personal_sections')
       .select('id, student_id, content')
       .eq('id', id)
       .single();
@@ -401,14 +425,14 @@ export const updatePersonalSectionByTeacher = async (req: AuthenticatedRequest, 
 
     // Update the personal section content
     const { data, error } = await supabase
-      .from('personalsections')
+      .from('personal_sections')
       .update({ content})
       .eq('id', id)
       .select(`
         id,
         content,
         created_at,
-        topic:personalsectiontopics (id, title)
+        topic:personal_section_topics (id, title)
       `)
       .single();
 
@@ -421,7 +445,7 @@ export const updatePersonalSectionByTeacher = async (req: AuthenticatedRequest, 
   }
 };
 
-export const getMyPersonalSections = async (req: AuthenticatedRequest, res: Response) => {
+export const getMypersonal_sections = async (req: AuthenticatedRequest, res: Response) => {
   try {
  
 
@@ -436,12 +460,12 @@ export const getMyPersonalSections = async (req: AuthenticatedRequest, res: Resp
     }
 
     const { data, error } = await supabase
-      .from('personalsections')
+      .from('personal_sections')
       .select(`
         id,
         content,
         created_at,
-        topic:personalsectiontopics (id, title)
+        topic:personal_section_topics (id, title)
       `)
       .eq('student_id', student.id)
       .order('created_at', { ascending: false });
@@ -472,12 +496,12 @@ export const getMyPersonalSectionByTopic = async (req: AuthenticatedRequest, res
     // Fetch student's personal section for this topic
     console.log(student, topicId, 'TOPICS', 'student')
     const { data, error } = await supabase
-      .from('personalsections')
+      .from('personal_sections')
       .select(`
         id,
         content,
         created_at,
-        topic:personalsectiontopics (id, title)
+        topic:personal_section_topics (id, title)
       `)
       .eq('student_id', student.id)
       .eq('topic_id', topicId)

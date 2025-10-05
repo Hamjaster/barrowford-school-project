@@ -21,7 +21,7 @@ const canResetSpecificUserPassword = (creatorRole: string, targetRole: string) =
 const createRoleSpecificEntry = async (role: string, additionalData: any = {}) => {
   try {
     const table = getRoleTable(role as UserRole);
-    
+
     switch (role) {
       case 'admin':
         const { data: adminData, error: adminError } = await supabase
@@ -31,7 +31,7 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
             first_name: additionalData.first_name,
             last_name: additionalData.last_name,
             email: additionalData.email,
-            
+
           })
           .select()
           .single();
@@ -40,17 +40,17 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
 
       case 'staff_admin':
         const { data: staffAdminData, error: staffAdminError } = await supabase
-        .from(table)
-        .insert({
-          auth_user_id: additionalData.auth_user_id,
-          first_name: additionalData.first_name,
-          last_name: additionalData.last_name,
-          email: additionalData.email,
-        })
-        .select()
-        .single();
-      if (staffAdminError) throw staffAdminError;
-      return staffAdminData;
+          .from(table)
+          .insert({
+            auth_user_id: additionalData.auth_user_id,
+            first_name: additionalData.first_name,
+            last_name: additionalData.last_name,
+            email: additionalData.email,
+          })
+          .select()
+          .single();
+        if (staffAdminError) throw staffAdminError;
+        return staffAdminData;
       case 'staff':
         const { data: staffData, error: teacherError } = await supabase
           .from(table)
@@ -78,8 +78,8 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
           })
           .select()
           .single();
-          console.log("Parent error", parentError);
-          console.log("Parent data", parentData);
+        console.log("Parent error", parentError);
+        console.log("Parent data", parentData);
         if (parentError) throw parentError;
         return parentData;
 
@@ -95,6 +95,7 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
             email: additionalData.email,
             first_name: additionalData.first_name,
             last_name: additionalData.last_name,
+            profile_photo: additionalData.profile_photo
           })
           .select()
           .single();
@@ -106,11 +107,11 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
             parent_id: pid,
             student_id: studentData.id
           }));
-  
+
           const { error: relError } = await supabase
-            .from('parentstudentrelationship')
+            .from('parent_student_relationship')
             .insert(relationships);
-  
+
           if (relError) throw relError;
         }
         return studentData;
@@ -140,7 +141,7 @@ export const login = async (req: Request, res: Response) => {
     // Only students use username
     emailToUse = username + '@school.com';
   }
-  
+
   const { data, error } = await supabase.auth.signInWithPassword({
     email: emailToUse!,
     password
@@ -157,9 +158,9 @@ export const login = async (req: Request, res: Response) => {
 
   // Check if user is active
   if (userProfile.status && userProfile.status !== 'active') {
-    return res.status(403).json({ 
+    return res.status(403).json({
       success: false,
-      error: 'Account is inactive. Please contact an administrator.' 
+      error: 'Account is inactive. Please contact an administrator.'
     });
   }
 
@@ -178,7 +179,7 @@ export const login = async (req: Request, res: Response) => {
       first_name: userProfile.first_name,
       last_name: userProfile.last_name,
       dob: userProfile.dob
-    }, 
+    },
     session: data.session
   };
 
@@ -191,48 +192,51 @@ export const login = async (req: Request, res: Response) => {
 
 export const createUser = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { 
+    const {
       email, // for non-students
       username, // for students only
-      password, 
-      first_name, 
-      last_name, 
-      role, 
+      password,
+      first_name,
+      last_name,
+      role,
       parent_ids, // an array of parent ids
       year_group_id,
       class_id,
+      profile_photo,
       current_year_group_id // for students - enrollment year
     } = req.body;
+
     const creatorRole = req.user.role;
     let emailToUse = email;
 
     if (role === 'student' && !email) {
-      // generate an imaginary email from username
+
       emailToUse = username + '@school.com';
     }
 
-    
+
     // Validate role
     if (!isValidRole(role)) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Invalid role' 
+        error: 'Invalid role'
       });
     }
     // Additional role-specific validation
     const canCreateRole = canCreateSpecificRole(creatorRole, role);
-    if (!canCreateRole.allowed) {                                                                                                                                                                                                 4
-      return res.status(403).json({ 
+    if (!canCreateRole.allowed) {
+      4
+      return res.status(403).json({
         success: false,
-        error: canCreateRole.message 
+        error: canCreateRole.message
       });
     }
 
     // Validate required fields
     if (!emailToUse || !password || !first_name || !last_name || !role) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Email, password, first name, last name, and role are required' 
+        error: 'Email, password, first name, last name, and role are required'
       });
     }
 
@@ -243,17 +247,17 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       if (!parent_ids || !Array.isArray(parent_ids) || parent_ids.length === 0) {
         return res.status(400).json({ error: 'At least one parent ID is required for student accounts' });
       }
- // Verify parents exist
- const { data: fetchedParents, error: parentsError } = await supabase
- .from('parents')
- .select('id, email, first_name, last_name')
- .in('id', parent_ids);
+      // Verify parents exist
+      const { data: fetchedParents, error: parentsError } = await supabase
+        .from('parents')
+        .select('id, email, first_name, last_name')
+        .in('id', parent_ids);
 
-if (parentsError || !fetchedParents || fetchedParents.length !== parent_ids.length) {
- return res.status(400).json({ error: 'One or more parent IDs are invalid' });
-}
+      if (parentsError || !fetchedParents || fetchedParents.length !== parent_ids.length) {
+        return res.status(400).json({ error: 'One or more parent IDs are invalid' });
+      }
 
-parentDataList = fetchedParents;
+      parentDataList = fetchedParents;
 
       // Validate current_year_group_id for students
       if (!current_year_group_id) {
@@ -283,9 +287,9 @@ parentDataList = fetchedParents;
 
     const existingUser = emailChecks.find(check => check.data && !check.error);
     if (existingUser) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'User with this email/username already exists' 
+        error: 'User with this email/username already exists'
       });
     }
     console.log("EMAIL TO USE", emailToUse);
@@ -303,16 +307,16 @@ parentDataList = fetchedParents;
     console.log("User created in auth", authData);
 
     if (authError) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: authError.message 
+        error: authError.message
       });
     }
 
     // Create user directly in role-specific table
     if (authData.user) {
       try {
-        const userData = {
+        const userData: Record<string, any> = {
           first_name,
           last_name,
           email: emailToUse,
@@ -323,10 +327,12 @@ parentDataList = fetchedParents;
           parent_ids,
           username,
         };
-
+        if (profile_photo) {
+          userData.profile_photo = profile_photo;
+        }
         console.log("User data", userData);
 
-        const createdUser = await createRoleSpecificEntry( role, userData);
+        const createdUser = await createRoleSpecificEntry(role, userData);
         console.log(`${role} entry created successfully`, createdUser);
 
         // Get actual user ID for audit log
@@ -348,9 +354,9 @@ parentDataList = fetchedParents;
         console.error(`Failed to create ${role} entry:`, roleError);
         // If role-specific creation fails, clean up auth user
         await supabase.auth.admin.deleteUser(authData.user.id);
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          error: `Failed to create ${role} profile: ${roleError}` 
+          error: `Failed to create ${role} profile: ${roleError}`
         });
       }
     }
@@ -360,12 +366,12 @@ parentDataList = fetchedParents;
       // For students, send email to parent; for others, send to their own email
       let emailRecipient = emailToUse;
       let recipientName = `${first_name} ${last_name}`;
-      
+
       if (role === 'student' && parentDataList.length > 0) {
         emailRecipient = parentDataList[0].email;
         recipientName = `${parentDataList[0].first_name} ${parentDataList[0].last_name}`;
       }
-      
+
       await sendUserCreationEmail(
         emailRecipient,
         first_name,
@@ -382,7 +388,7 @@ parentDataList = fetchedParents;
       // The user is created successfully, email is just a bonus
     }
 
-      const formatRole = (role: string) => {
+    const formatRole = (role: string) => {
       return role
         .split('_') // Split by underscore
         .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize each word
@@ -392,7 +398,7 @@ parentDataList = fetchedParents;
     // Prepare response
     const emailRecipientForMessage = role === 'student' && parentDataList.length > 0 ? parentDataList[0].email : emailToUse;
     const emailRecipientNote = role === 'student' && parentDataList.length > 0 ? ' (sent to parent)' : '';
-    
+
     const responseData: any = {
       success: true,
       message: `${formatRole(role)} account created successfully. Welcome email sent to ${emailRecipientForMessage}${emailRecipientNote}.`,
@@ -416,9 +422,9 @@ parentDataList = fetchedParents;
 
   } catch (error) {
     console.error('Error creating user:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Internal server error' 
+      error: 'Internal server error'
     });
   }
 };
@@ -431,7 +437,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
   const user = await AuthUtils.findUserByEmail(email);
   if (!user) {
-    return res.status(200).json({ success: true, message: 'If an account exists, a reset link has been sent' });
+    return res.status(200).json({ success: true, message: 'A reset link has been sent to that email address' });
   }
 
   if (user.role === 'student') {
@@ -456,9 +462,9 @@ export const resetPassword = async (req: Request, res: Response) => {
     const { accessToken, refreshToken, newPassword } = req.body;
 
     if (!accessToken || !newPassword) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Access token and new password are required' 
+        error: 'Access token and new password are required'
       });
     }
 
@@ -478,9 +484,9 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     if (sessionError || !sessionData.session) {
       console.error('Error setting session:', sessionError);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Invalid or expired reset tokens' 
+        error: 'Invalid or expired reset tokens'
       });
     }
 
@@ -488,27 +494,27 @@ export const resetPassword = async (req: Request, res: Response) => {
     console.log('User from session:', user);
 
     if (!user) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        error: 'Invalid session' 
+        error: 'Invalid session'
       });
     }
 
     // Check if user exists in our app_user table and get their role
-     const userData = await AuthUtils.findUserByAuthUserId(user.id);
+    const userData = await AuthUtils.findUserByAuthUserId(user.id);
 
     if (!userData) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'User not found in system' 
+        error: 'User not found in system'
       });
     }
 
     // Students cannot reset passwords via email
     if (userData.role === 'student') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        error: 'Students cannot reset passwords via email' 
+        error: 'Students cannot reset passwords via email'
       });
     }
 
@@ -519,25 +525,25 @@ export const resetPassword = async (req: Request, res: Response) => {
       password: newPassword
     });
     console.log('UPDATED PASSWORD !');
-    
+
     if (updateError) {
       console.error('Error updating password:', updateError);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: updateError.message || 'Failed to update password' 
+        error: updateError.message || 'Failed to update password'
       });
     }
 
-    res.status(200).json({ 
+    res.json({ 
       success: true,
-      message: 'Password has been reset successfully' 
+      message: 'Password has been reset successfully'
     });
 
   } catch (error) {
     console.error('Error in reset password:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Internal server error' 
+      error: 'Internal server error'
     });
   }
 };
@@ -549,9 +555,9 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
     const creatorRole = req.user.role;
 
     if (!email || !newPassword) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Email and new password are required' 
+        error: 'Email and new password are required'
       });
     }
 
@@ -559,18 +565,18 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
     const targetUser = await AuthUtils.findUserByEmail(email);
 
     if (!targetUser) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        error: 'Target user not found' 
+        error: 'Target user not found'
       });
     }
 
     // Check if creator can reset this user's password
     const canResetPassword = canResetSpecificUserPassword(creatorRole, targetUser.role);
     if (!canResetPassword.allowed) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         success: false,
-        error: canResetPassword.message 
+        error: canResetPassword.message
       });
     }
 
@@ -583,22 +589,22 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
 
     if (authError) {
       console.error('Error updating password in auth:', authError);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Failed to update password' 
+        error: 'Failed to update password'
       });
     }
 
-    res.status(200).json({ 
+    res.json({ 
       success: true,
       message: `Password for ${targetUser.email} has been reset successfully`
     });
 
   } catch (error) {
     console.error('Error in manual password reset:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: 'Internal server error' 
+      error: 'Internal server error'
     });
   }
 };
