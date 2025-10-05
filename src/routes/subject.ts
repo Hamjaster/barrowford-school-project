@@ -7,7 +7,8 @@ import {
   getAllSubjects,
   toggleSubjectStatus,
   getAllYearGroups,
-  getSubjectsByYearGroup
+  getSubjectsByYearGroup,
+  getEligibleYearGroupsForStudent
 } from '../controllers/subjectController.js';
 
 const router = Router();
@@ -22,5 +23,6 @@ router.patch('/status/:id', authenticateToken, checkPermission('manage_users'), 
 // Year groups and subjects by year group routes
 router.get('/year-groups', getAllYearGroups);
 router.get('/year-groups/:yearGroupId/subjects', getSubjectsByYearGroup);
+router.get('/eligible-year-groups', authenticateToken, getEligibleYearGroupsForStudent);
 
 export default router;
