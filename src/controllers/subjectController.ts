@@ -263,10 +263,10 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
 
     // Get all year groups with their subjects in a single query
     const { data: allYearGroupsWithSubjects, error: yearGroupsError } = await supabase
-      .from('yeargroups')
+      .from('year_groups')
       .select(`
         *,
-        year_group_subject (
+        year_group_s                       ubject (
           subjects (
             id,
             name,
