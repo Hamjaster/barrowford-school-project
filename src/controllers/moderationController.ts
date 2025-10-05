@@ -290,28 +290,56 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
         });
       }
     } else if (mod.entity_type === 'student_learning_entities') {
-      // map to student_learning_entities
       if (mod.action_type === 'create') {
-        const insertPayload = mod.new_content;
-        const { data: inserted, error: insertErr } = await supabase
+        // Update existing learning record status to 'approved'
+        const { data: updated, error: updateErr } = await supabase
           .from('student_learning_entities')
-          .insert(insertPayload)
+          .update({ 
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id)
           .select()
           .single();
-        if (insertErr) throw insertErr;
-        applyResult = inserted;
+
+        if (updateErr) throw updateErr;
+        applyResult = updated;
 
         // Log audit for create action
         await logAudit({
           action: 'create',
           entityType: 'student_learning_entities',
-          entityId: inserted.id,
-          oldValue: null,
-          newValue: inserted,
+          entityId: mod.entity_id,
+          oldValue: { ...mod.new_content, status: 'pending' },
+          newValue: updated,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      } else if (mod.action_type === 'update') {
+        const updatePayload = mod.new_content;
+        const { data: updated, error: updateErr } = await supabase
+          .from('student_learning_entities')
+          .update({
+            ...updatePayload,
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id)
+          .select()
+          .single();
+        if (updateErr) throw updateErr;
+        applyResult = updated;
+
+        // Log audit for update action
+        await logAudit({
+          action: 'update',
+          entityType: 'student_learning_entities',
+          entityId: mod.entity_id,
+          oldValue: mod.old_content,
+          newValue: updated,
           actorId: mod.student_id,
           actorRole: 'student'
         });
       } else if (mod.action_type === 'delete') {
+        // Actually delete the record when deletion is approved
         const { error: delErr } = await supabase
           .from('student_learning_entities')
           .delete()
@@ -330,7 +358,56 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
           actorRole: 'student'
         });
       }
+    } else if (mod.entity_type === 'personal_sections') {
+      if (mod.action_type === 'create') {
+        // Update existing personal section status to 'approved'
+        const { data: updated, error: updateErr } = await supabase
+          .from('personal_sections')
+          .update({ 
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id)
+          .select()
+          .single();
 
+        if (updateErr) throw updateErr;
+        applyResult = updated;
+
+        // Log audit for create action
+        await logAudit({
+          action: 'create',
+          entityType: 'personal_sections',
+          entityId: mod.entity_id,
+          oldValue: { ...mod.new_content, status: 'pending' },
+          newValue: updated,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      } else if (mod.action_type === 'update') {
+        const updatePayload = mod.new_content;
+        const { data: updated, error: updateErr } = await supabase
+          .from('personal_sections')
+          .update({
+            ...updatePayload,
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id)
+          .select()
+          .single();
+        if (updateErr) throw updateErr;
+        applyResult = updated;
+
+        // Log audit for update action
+        await logAudit({
+          action: 'update',
+          entityType: 'personal_sections',
+          entityId: mod.entity_id,
+          oldValue: mod.old_content,
+          newValue: updated,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      }
     } else {
       return res.status(400).json({ success: false, error: 'Unsupported entity_type' });
     }
@@ -441,6 +518,56 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
           .eq('id', mod.entity_id);
 
         if (reflectionUpdateErr) throw reflectionUpdateErr;
+      }
+    }
+
+    // Handle student_learning_entities rejection by updating status
+    if (mod.entity_type === 'student_learning_entities') {
+      if (mod.action_type === 'create') {
+        // Rejecting creation - update status to 'rejected'
+        const { error: learningUpdateErr } = await supabase
+          .from('student_learning_entities')
+          .update({ 
+            status: 'rejected',
+          })
+          .eq('id', mod.entity_id);
+
+        if (learningUpdateErr) throw learningUpdateErr;
+      } else if (mod.action_type === 'delete') {
+        // Rejecting deletion - revert status back to 'approved'
+        const { error: learningUpdateErr } = await supabase
+          .from('student_learning_entities')
+          .update({ 
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id);
+
+        if (learningUpdateErr) throw learningUpdateErr;
+      }
+    }
+
+    // Handle personal_sections rejection by updating status
+    if (mod.entity_type === 'personal_sections') {
+      if (mod.action_type === 'create') {
+        // Rejecting creation - update status to 'rejected'
+        const { error: personalSectionUpdateErr } = await supabase
+          .from('personal_sections')
+          .update({ 
+            status: 'rejected'
+          })
+          .eq('id', mod.entity_id);
+
+        if (personalSectionUpdateErr) throw personalSectionUpdateErr;
+      } else if (mod.action_type === 'update') {
+        // Rejecting update - revert status back to 'approved'
+        const { error: personalSectionUpdateErr } = await supabase
+          .from('personal_sections')
+          .update({ 
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id);
+
+        if (personalSectionUpdateErr) throw personalSectionUpdateErr;
       }
     }
 
