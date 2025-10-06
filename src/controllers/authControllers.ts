@@ -90,6 +90,7 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
             auth_user_id: additionalData.auth_user_id,
             year_group_id: additionalData.year_group_id || null,
             class_id: additionalData.class_id || null,
+            current_year_group_id: additionalData.current_year_group_id,
             username: additionalData.username,
             email: additionalData.email,
             first_name: additionalData.first_name,
@@ -201,7 +202,8 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       parent_ids, // an array of parent ids
       year_group_id,
       class_id,
-      profile_photo
+      profile_photo,
+      current_year_group_id // for students - enrollment year
     } = req.body;
 
     const creatorRole = req.user.role;
@@ -256,8 +258,24 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       }
 
       parentDataList = fetchedParents;
-    }
 
+      // Validate current_year_group_id for students
+      if (!current_year_group_id) {
+        return res.status(400).json({ error: 'Current year group ID is required for student accounts' });
+      }
+
+      // Verify year group exists
+      const { data: yearGroup, error: yearGroupError } = await supabase
+        .from('yeargroups')
+        .select('id, name')
+        .eq('id', current_year_group_id)
+        .single();
+
+      if (yearGroupError || !yearGroup) {
+        return res.status(400).json({ error: 'Invalid year group ID' });
+      }
+    }
+    console.log(emailToUse, "emailToUse !!!");
     // Check if user already exists across all role tables
     const emailChecks = await Promise.all([
       supabase.from('admins').select('email').eq('email', emailToUse).single(),
@@ -271,7 +289,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        error: 'User with this email already exists'
+        error: 'User with this email/username already exists'
       });
     }
     console.log("EMAIL TO USE", emailToUse);
@@ -305,6 +323,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
           auth_user_id: authData.user.id,
           year_group_id,
           class_id,
+          current_year_group_id,
           parent_ids,
           username,
         };
