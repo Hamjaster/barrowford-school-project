@@ -109,7 +109,7 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
           }));
 
           const { error: relError } = await supabase
-            .from('parent_student_relationship')
+            .from('parent_student_relationships')
             .insert(relationships);
 
           if (relError) throw relError;

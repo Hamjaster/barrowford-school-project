@@ -60,7 +60,7 @@ export const formatRole = (role: string) => {
     actorId: string;
     actorRole: string;
   }) => {
-   const {  data, error}= await supabase.from("auditlogs").insert({
+   const {  data, error}= await supabase.from("audit_logs").insert({
       action,
       entity_type: entityType,
       entity_id: entityId,
