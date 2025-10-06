@@ -242,3 +242,79 @@ export const getSubjectsByYearGroup = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+// Get eligible year groups for a student based on their current enrollment year
+export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    // Get student's current year group and enrollment date using auth user ID
+    const { data: student, error: studentError } = await supabase
+      .from('students')
+      .select('current_year_group_id, created_at')
+      .eq('auth_user_id', req.user.userId)
+      .single();
+
+    if (studentError || !student) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    if (!student.current_year_group_id) {
+      return res.status(400).json({ error: 'Student does not have a current year group assigned' });
+    }
+
+    // Get all year groups with their subjects in a single query
+    const { data: allYearGroupsWithSubjects, error: yearGroupsError } = await supabase
+      .from('year_groups')
+      .select(`
+        *,
+        year_group_s                       ubject (
+          subjects (
+            id,
+            name,
+            status,
+            created_at
+          )
+        )
+      `)
+      .order('id', { ascending: true });
+
+    if (yearGroupsError) {
+      throw yearGroupsError;
+    }
+
+    // Determine eligible year groups based on enrollment logic
+    // Students can see all year groups from EYFS (id=1) up to their current year group
+    // This handles both scenarios:
+    // 1. Student enrolled in EYFS and upgraded to Year 2 -> sees EYFS, Year 1, Year 2
+    // 2. Student directly enrolled in Year 2 -> sees EYFS, Year 1, Year 2 (same result)
+    const eligibleYearGroupsWithSubjects = allYearGroupsWithSubjects
+      .filter((yearGroup: any) => {
+        // EYFS is id=1, Year 1 is id=2, Year 2 is id=3, etc.
+        // Students can access all years from EYFS up to their current year
+        return yearGroup.id >= 1 && yearGroup.id <= student.current_year_group_id;
+      })
+      .map((yearGroup: any) => {
+        // Extract subjects from the joined data and filter only active subjects
+        const subjects = yearGroup.year_group_subject
+          .map((item: any) => item.subjects)
+          .filter((subject: any) => subject != null && subject.status === 'active');
+
+        return {
+          id: yearGroup.id,
+          name: yearGroup.name,
+          description: yearGroup.description,
+          created_at: yearGroup.created_at,
+          subjects: subjects
+        };
+      });
+
+    res.status(200).json({ 
+      success: true, 
+      data: eligibleYearGroupsWithSubjects,
+      studentCurrentYear: student.current_year_group_id,
+      studentEnrollmentDate: student.created_at
+    });
+  } catch (err: any) {
+    console.error('Error fetching eligible year groups for student:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};

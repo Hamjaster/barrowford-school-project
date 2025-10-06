@@ -28,16 +28,24 @@ export const addStudentLearning = async (req: AuthenticatedRequest, res: Respons
       const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
       if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
       
-
+      // Create learning record with pending status
+      const { data: learning, error: learningErr } = await supabase
+        .from('student_learning_entities')
+        .insert({
+          student_id: student.id,
+          subject_id: subject_id,
+          title,
+          description: content,
+          attachment_url,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
       
-      const new_content = {
-        student_id: student.id,
-        subject_id: subject_id,
-        title,
-        description: content,
-        attachment_url
-      };
-  
+      if (learningErr) throw learningErr;
+
+      // Create moderation record for teacher review
       const { data: moderation, error: modErr } = await supabase
         .from('moderations')
         .insert({
@@ -45,19 +53,20 @@ export const addStudentLearning = async (req: AuthenticatedRequest, res: Respons
           year_group_id: student.year_group_id,
           class_id: student.class_id,
           entity_type: 'student_learning_entities',
-          entity_id: null,
-          entity_title: title, // Use the title directly as entity_title
+          entity_id: learning.id,
+          entity_title: title,
           old_content: null,
-          new_content: new_content,
+          new_content: learning,
           action_type: 'create',
           status: 'pending',
           created_at: new Date().toISOString()
         })
         .select()
         .single();
+      
       if (modErr) throw modErr;
 
-      res.status(201).json({ success: true, message: 'Learning submitted for moderation', data : moderation });
+      res.status(201).json({ success: true, message: 'Learning created and submitted for moderation', data: learning });
     } catch (err: any) {
       console.error('Error adding student learning:', err);
       res.status(500).json({ error: 'Internal server error' });
@@ -76,7 +85,7 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
       const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
       if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
 
-      // fetch learning row to store old_content
+      // fetch learning row to check if it exists and belongs to student
       const { data: learningRow, error: learningErr } = await supabase
         .from('student_learning_entities')
         .select('*')
@@ -86,7 +95,20 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
         
       if (learningErr || !learningRow) return res.status(404).json({ error: 'Learning not found' });
 
-      // create a moderation - action_type = 'delete'
+      // Update learning status to pending_deletion
+      const { data: updatedLearning, error: updateErr } = await supabase
+        .from('student_learning_entities')
+        .update({ 
+          status: 'pending_deletion',
+        })
+        .eq('id', id)
+        .eq('student_id', student.id)
+        .select()
+        .single();
+      
+      if (updateErr) throw updateErr;
+
+      // Create moderation record for teacher review
       const { data: moderation, error: modErr } = await supabase
         .from('moderations')
         .insert({
@@ -95,18 +117,19 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
           class_id: student.class_id,
           entity_type: 'student_learning_entities',
           entity_id: id,
-          entity_title: learningRow.title, // Use the title from the learning row
+          entity_title: learningRow.title,
           old_content: learningRow,
-          new_content: null,
+          new_content: updatedLearning,
           action_type: 'delete',
           status: 'pending',
           created_at: new Date().toISOString()
         })
         .select()
         .single();
+      
       if (modErr) throw modErr;
 
-      res.status(200).json({ success: true, message: 'Deletion of Learning submitted for moderation', data : moderation });
+      res.status(200).json({ success: true, message: 'Learning deletion submitted for moderation', data: updatedLearning });
     } catch (err: any) {
       console.error('Error deleting student learning:', err);
       res.status(500).json({ error: 'Internal server error' });
@@ -124,12 +147,10 @@ export const getMyLearnings = async (req: AuthenticatedRequest, res: Response) =
     const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
     
-    
-    
-// only return learnings for the subject_id if provided
+    // only return learnings for the subject_id if provided
     const { data, error } = await supabase
       .from('student_learning_entities')
-      .select('id, subject_id, title, description, attachment_url, created_at')
+      .select('id, subject_id, title, description, attachment_url, status, created_at')
       .eq('student_id', student.id)
       .eq('subject_id', subject_id)
       .order('created_at', { ascending: false });

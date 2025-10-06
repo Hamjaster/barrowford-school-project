@@ -240,20 +240,13 @@ const {status} = req.body;
 // ONLY FOR STUDENTS
 export const createPersonalSection = async (req: AuthenticatedRequest, res: Response) => {
   try {
-
-
     const { topic_id, content } = req.body;
     if (!topic_id || !content) {
       return res.status(400).json({ error: 'Topic ID and content are required' });
     }
 
     // Find student record
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select('id')
-      .eq('auth_user_id', req.user.userId)
-      .single();
-
+    const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
     if (studentError || !student) {
       return res.status(404).json({ error: 'Student record not found' });
     }
@@ -275,30 +268,43 @@ export const createPersonalSection = async (req: AuthenticatedRequest, res: Resp
       });
     }
 
+    // Create personal section with pending status
     const { data, error } = await supabase
       .from('personal_sections')
-      .insert({ student_id: student.id, topic_id, content })
+      .insert({ 
+        student_id: student.id, 
+        topic_id, 
+        content,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
       .select()
       .single();
 
     if (error) throw error;
 
-    // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // Create moderation record for teacher review
+    const { data: moderation, error: modErr } = await supabase
+      .from('moderations')
+      .insert({
+        student_id: student.id,
+        year_group_id: student.year_group_id,
+        class_id: student.class_id,
+        entity_type: 'personal_sections',
+        entity_id: data.id,
+        entity_title: `Personal Section - Topic ${topic_id}`,
+        old_content: null,
+        new_content: data,
+        action_type: 'create',
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (modErr) throw modErr;
 
-    // Log audit for create action
-    await logAudit({
-      action: 'create',
-      entityType: 'personal_sections',
-      entityId: data.id,
-      oldValue: null,
-      newValue: data,
-      actorId: user.id,
-      actorRole: req.user.role
-    });
-
-    res.status(201).json({ success: true, data });
+    res.status(201).json({ success: true, message: 'Personal section created and submitted for moderation', data });
   } catch (err: any) {
     console.error('Error creating personal section:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -306,18 +312,11 @@ export const createPersonalSection = async (req: AuthenticatedRequest, res: Resp
 };
 export const updatePersonalSection = async (req: AuthenticatedRequest, res: Response) => {
   try {
-  
-
     const { id } = req.params;
     const { content } = req.body;
 
     // Find student record
-    const { data: student, error: studentError } = await supabase
-      .from('students')
-      .select('id')
-      .eq('auth_user_id', req.user.userId)
-      .single();
-
+    const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
     if (studentError || !student) {
       return res.status(404).json({ error: 'Student record not found' });
     }
@@ -332,9 +331,14 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
 
     if (oldError) throw oldError;
 
+    // Update personal section with pending_updation status
     const { data, error } = await supabase
       .from('personal_sections')
-      .update({ content })
+      .update({ 
+        content,
+        status: 'pending_updation',
+        
+      })
       .eq('id', id)
       .eq('student_id', student.id)
       .select()
@@ -342,22 +346,28 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
 
     if (error) throw error;
 
-    // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // Create moderation record for teacher review
+    const { data: moderation, error: modErr } = await supabase
+      .from('moderations')
+      .insert({
+        student_id: student.id,
+        year_group_id: student.year_group_id,
+        class_id: student.class_id,
+        entity_type: 'personal_sections',
+        entity_id: id,
+        entity_title: `Personal Section Update - Topic ${oldData.topic_id}`,
+        old_content: oldData,
+        new_content: data,
+        action_type: 'update',
+        status: 'pending',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (modErr) throw modErr;
 
-    // Log audit for update action
-    await logAudit({
-      action: 'update',
-      entityType: 'personal_sections',
-      entityId: id,
-      oldValue: oldData,
-      newValue: data,
-      actorId: user.id,
-      actorRole: req.user.role
-    });
-
-    res.status(200).json({ success: true, data });
+    res.status(200).json({ success: true, message: 'Personal section update submitted for moderation', data });
   } catch (err: any) {
     console.error('Error updating personal section:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -388,7 +398,9 @@ export const getStudentpersonal_sections = async (req: AuthenticatedRequest, res
       .select(`
         id,
         content,
+        status,
         created_at,
+      
         topic:personal_section_topics (id, title)
       `)
       .eq('student_id', studentId)
@@ -464,6 +476,7 @@ export const getMypersonal_sections = async (req: AuthenticatedRequest, res: Res
       .select(`
         id,
         content,
+        status,
         created_at,
         topic:personal_section_topics (id, title)
       `)
@@ -500,7 +513,9 @@ export const getMyPersonalSectionByTopic = async (req: AuthenticatedRequest, res
       .select(`
         id,
         content,
+        status,
         created_at,
+       
         topic:personal_section_topics (id, title)
       `)
       .eq('student_id', student.id)
