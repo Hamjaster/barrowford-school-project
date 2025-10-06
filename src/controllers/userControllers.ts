@@ -2,7 +2,7 @@ import { AuthenticatedRequest, checkPermission } from "../middleware/auth.js";
 import { Response } from "express";
 import { supabase } from "../db/supabase.js";
 import { canManageRole, getManageableRoles, getRoleTable, canManageUsers, UserRole } from "../utils/roleUtils.js";
-import { logAudit, findUserByAuthUserId } from "../utils/lib.js";
+import { logAudit, findUserByAuthUserId, getChildrenOfParent, cleanupStudentOnDeactivation, handleParentDeactivation, handleParentActivation } from "../utils/lib.js";
 
 export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -153,6 +153,39 @@ export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response)
 
     if (oldError) throw oldError;
 
+    // Special handling for student activation - check if at least one parent is active
+    if (role === 'student' && action === 'activate') {
+      // Get student's parents through the relationship table
+      const { data: parentRelationships, error: relationshipError } = await supabase
+        .from('parent_student_relationship')
+        .select(`
+          parent:parents (
+            id,
+            status
+          )
+        `)
+        .eq('student_id', userId);
+
+      if (relationshipError) throw relationshipError;
+
+      if (parentRelationships && parentRelationships.length > 0) {
+        // Check if at least one parent is active
+        const hasActiveParent = parentRelationships.some((rel: any) => 
+          rel.parent && rel.parent.status === 'active'
+        );
+
+        if (!hasActiveParent) {
+          return res.status(400).json({
+            success: false, 
+            error: 'Cannot activate student. Kindly activate at least one parent first.' 
+          });
+        }
+      } else {
+        // Student has no parents - allow activation
+        console.log('Student has no parents, allowing activation');
+      }
+    }
+
     // Update status in correct role table
     const { data: newData, error } = await supabase
       .from(table)
@@ -178,8 +211,67 @@ export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response)
       actorRole: req.user.role
     });
 
+    // Special handling for student deactivation - clean up moderations and entities
+    if (role === 'student' && action === 'deactivate') {
+      await cleanupStudentOnDeactivation(userId);
+    }
+
+    // Special handling for parent status changes - cascade to children
+    if (role === 'parent') {
+      const newStatus = action === 'activate' ? 'active' : 'inactive';
+      
+      // Use utility functions to handle parent-child cascade logic
+      let parentResult;
+      if (action === 'activate') {
+        parentResult = await handleParentActivation(userId);
+      } else {
+        parentResult = await handleParentDeactivation(userId);
+      }
+      console.log(parentResult.childrenToUpdate, 'CHILDREN TO WORK ON !');
+      // Update the children that need status change
+      for (const child of parentResult.childrenToUpdate) {
+        console.log(child, 'child TO BE UPDATED');
+        const { error: updateChildrenError } = await supabase
+          .from('students')
+          .update({ status: newStatus })
+          .eq('id', child.id);
+
+        // moderations cleanup after de-activation of the student
+        if (newStatus === 'inactive') {
+          await cleanupStudentOnDeactivation(child.id);
+        }
+
+        if (updateChildrenError) throw updateChildrenError;
+        await logAudit({
+          action: 'update',
+          entityType: 'students',
+          entityId: child.id,
+          oldValue: { ...child, status: child.status },
+          newValue: { ...child, status: newStatus },
+          actorId: user.id,
+          actorRole: req.user.role
+        });
+      }
+
+      const capitalizedRole = role.charAt(0).toUpperCase() + role.slice(1);
+      if (parentResult.affectedChildren > 0) {
+        res.status(200).json({ 
+          success: true, 
+          message: `${capitalizedRole} ${action}d successfully. Moreover, ${parentResult.affectedChildren} child(ren) also ${action}d.`,
+          affectedChildren: parentResult.affectedChildren
+        });
+      } else {
+        res.status(200).json({ 
+          success: true, 
+          message: `${capitalizedRole} ${action}d successfully. ${parentResult.message}`
+        });
+      }
+      return;
+    }
+
     const capitalizedRole = role.charAt(0).toUpperCase() + role.slice(1);
-    res.status(200).json({ success: true, message: `${capitalizedRole} ${action}d successfully` });  } catch (err: any) {
+    res.status(200).json({ success: true, message: `${capitalizedRole} ${action}d successfully` });
+  } catch (err: any) {
     console.error('Error toggling status:', err);
     res.status(500).json({ error: 'Internal server error' });
   }

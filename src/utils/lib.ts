@@ -143,3 +143,203 @@ export const getPreviousWeeks = (currentWeek?: string): string[] => {
   return previousWeeks;
 };
   
+
+// make a util to return the children of a parent
+export const getChildrenOfParent = async (parentId: number) : Promise<any[]> => {
+  try {
+ // Find all children (students) linked with this parent - only active students
+ const { data: children, error: childrenError } = await supabase
+ .from('parent_student_relationship')
+ .select(`
+   student:students (id, first_name, last_name, username, year_group_id, class_id, created_at, status)
+ `)
+ .eq('parent_id', parentId);
+
+if (childrenError) throw childrenError;
+
+// Extract just the student objects from the response
+const studentObjects = children.map((item: any) => item.student).filter((student: any) => student != null);
+
+console.log(studentObjects, 'all STUDENTS !')
+
+  return studentObjects;
+  } catch (error) {
+    console.error('Error getting children of parent:', error);
+    throw error;
+  }
+};
+
+// Clean up student moderations and entities when student is deactivated
+export const cleanupStudentOnDeactivation = async (studentId: number) => {
+  try {
+    // 1. Delete all moderations submitted by this student
+    const { error: deleteModerationsError } = await supabase
+      .from('moderations')
+      .delete()
+      .eq('student_id', studentId);
+
+    if (deleteModerationsError) throw deleteModerationsError;
+
+    // 2. Handle student entities based on their status
+    // Get all student entities (images, learnings, reflections, personal_sections)
+    const entityTypes = ['student_images', 'student_learning_entities', 'reflections', 'personal_sections'];
+    
+    for (const entityType of entityTypes) {
+      // only get those who's status are in : pending, pending_deletion, pending_updation
+      const { data: entities, error: entitiesError } = await supabase
+        .from(entityType)
+        .select('*')
+        .eq('student_id', studentId)
+        .in('status', ['pending', 'pending_deletion', 'pending_updation']);
+      console.log('all of the entities! :', entities)
+      if (entitiesError) throw entitiesError;
+
+      for (const entity of entities) {
+        if (entity.status === 'pending') {
+          console.log('deleting :', entity)
+          // Delete entities that were requested for creation
+          const { error: deleteError } = await supabase
+            .from(entityType)
+            .delete()
+            .eq('id', entity.id);
+          
+          if (deleteError) throw deleteError;
+        } else if (entity.status === 'pending_deletion') {
+          // Revert deletion requests - update status back to 'approved'
+          const { error: revertError } = await supabase
+            .from(entityType)
+            .update({ 
+              status: 'approved',
+              
+            })
+            .eq('id', entity.id);
+          
+          if (revertError) throw revertError;
+        } else if (entity.status === 'pending_updation') {
+          // find the respective moderation record
+          const { data: moderation , error: moderationError } = await supabase
+            .from('moderations')
+            .select('*')
+            .eq('entity_id', entity.id)
+            .eq('entity_type', entityType)
+            .eq('action_type', 'update')
+            .single()
+
+          if (moderationError) throw moderationError;
+            console.log(moderation.old_content, 'moderation old content !');
+          const { error: revertUpdateError } = await supabase
+            .from(entityType)
+            .update({ 
+              status: 'approved',
+              content: moderation.old_content.content
+            })
+            .eq('id', entity.id);
+          
+          if (revertUpdateError) throw revertUpdateError;
+        }
+      }
+    }
+
+    console.log(`Student ${studentId} deactivated - cleaned up moderations and entities`);
+    return { success: true, message: 'Student cleanup completed successfully' };
+  } catch (error) {
+    console.error('Error cleaning up student on deactivation:', error);
+    throw error;
+  }
+};
+
+// Handle parent deactivation and child cascade logic
+export const handleParentDeactivation = async (parentId: number) => {
+  try {
+    // Get all children of this parent through the relationship table
+    const children = await getChildrenOfParent(parentId);
+
+    if (!children || children.length === 0) {
+      return { 
+        success: true, 
+        message: 'No children found for this parent.',
+        affectedChildren: 0,
+        childrenToUpdate: []
+      };
+    }
+
+    let childrenToUpdate: any[] = [];
+    let isLastActiveParent = false;
+
+    // Check if this parent is the last active parent for any of their children
+    for (const child of children) {
+      // Get all parents of this child
+      const { data: childParents, error: childParentsError } = await supabase
+        .from('parent_student_relationship')
+        .select(`
+          parent:parents (
+            id,
+            status
+          )
+        `)
+        .eq('student_id', child.id);
+
+      if (childParentsError) throw childParentsError;
+
+      // Count active parents for this child (including the current parent being deactivated)
+      const activeParentsCount = childParents.filter((rel: any) => 
+        rel.parent && rel.parent.status === 'active'
+      ).length;
+
+      console.log(activeParentsCount, 'activeParentsCount', childParents, 'parents !');
+
+      // If there's no active parent left after de-activation, then this is the last active parent
+      if (activeParentsCount === 0) {
+        isLastActiveParent = true;
+        break; // Found at least one child where this is the last active parent
+      }
+    }
+
+    // If this parent is the last active parent for their children, deactivate all children
+    if (isLastActiveParent) {
+      childrenToUpdate = children;
+    }
+
+    return {
+      success: true,
+      message: isLastActiveParent 
+        ? `Parent is the last active parent. ${children.length} child(ren) will be deactivated.`
+        : `Parent is not the last active parent. No children will be affected.`,
+      affectedChildren: childrenToUpdate.length,
+      childrenToUpdate: childrenToUpdate,
+      isLastActiveParent: isLastActiveParent
+    };
+  } catch (error) {
+    console.error('Error handling parent deactivation:', error);
+    throw error;
+  }
+};
+
+// Handle parent activation and child cascade logic
+export const handleParentActivation = async (parentId: number) => {
+  try {
+    // Get all children of this parent through the relationship table
+    const children = await getChildrenOfParent(parentId);
+
+    if (!children || children.length === 0) {
+      return { 
+        success: true, 
+        message: 'No children found for this parent.',
+        affectedChildren: 0,
+        childrenToUpdate: []
+      };
+    }
+
+    // When activating parent, no need to affect the children
+    return {
+      success: true,
+      message: ``,
+      affectedChildren: 0,
+      childrenToUpdate: [],
+      isLastActiveParent: false // Not applicable for activation
+    };
+  } catch (error) {
+    console.error('Error handling parent activation:', error);
+    throw error;
+  }
+};
