@@ -2,7 +2,7 @@ import { AuthenticatedRequest, checkPermission } from "../middleware/auth.js";
 import { Response } from "express";
 import { supabase } from "../db/supabase.js";
 import { canManageRole, getManageableRoles, getRoleTable, canManageUsers, UserRole } from "../utils/roleUtils.js";
-import { logAudit, findUserByAuthUserId } from "../utils/lib.js";
+import { logAudit, findUserByAuthUserId, formatRole } from "../utils/lib.js";
 
 export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -88,7 +88,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
             email: u.email,
             first_name: u.first_name,
             last_name: u.last_name,
-            role: allowedRole,
+            role: formatRole(allowedRole),
             created_at: u.created_at,
             status: u.status,
           }))
