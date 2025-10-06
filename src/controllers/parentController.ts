@@ -18,7 +18,7 @@ export const getMyChildren = async (req: AuthenticatedRequest, res: Response) =>
 
     // Find all children (students) linked with this parent - only active students
     const { data: children, error: childrenError } = await supabase
-      .from('parent_student_relationship')
+      .from('parent_student_relationships')
       .select(`
         student:students (id, first_name, last_name, username, year_group_id, class_id, created_at, status)
       `)
@@ -54,7 +54,7 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
     if (parentError || !parent) return res.status(404).json({ error: 'Parent record not found' });
 
     const { data: relation, error: relationError } = await supabase
-      .from('parent_student_relationship')
+      .from('parent_student_relationships')
       .select('id')
       .eq('parent_id', parent.id)
       .eq('student_id', studentId)
