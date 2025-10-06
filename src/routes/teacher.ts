@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticateToken, checkPermission } from '../middleware/auth.js';
-import { getAssignedStudents,getTeacherProfile ,updateStudentProfilePhoto} from '../controllers/teacherController.js';
+import { getAssignedStudents,getTeacherProfile ,updateStudentProfile} from '../controllers/teacherController.js';
 
 const router = Router();
 
@@ -12,10 +12,10 @@ router.get(
 );
 
 router.post(
-  "/update-profile-photo",
+  "/update-student-profile",
   authenticateToken,
   checkPermission("update_student_profile_photo"),
-  updateStudentProfilePhoto as any
+  updateStudentProfile as any
 );
 router.get(
   '/teacher-profile',

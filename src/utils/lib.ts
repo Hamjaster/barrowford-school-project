@@ -37,7 +37,12 @@ export const findUserByAuthUserId = async (authUserId: string) => {
   
   return null;
 };
-
+export const formatRole = (role: string) => {
+  return role
+    .split('_') // Split by underscore
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1)) // Capitalize each word
+    .join(' '); // Join with space
+};
  export const logAudit = async ({
     action,
     entityType,
