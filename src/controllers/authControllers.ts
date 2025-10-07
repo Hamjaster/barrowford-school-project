@@ -266,11 +266,11 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
 
       // Verify year group exists
       const { data: yearGroup, error: yearGroupError } = await supabase
-        .from('yeargroups')
+        .from('year_groups')
         .select('id, name')
         .eq('id', current_year_group_id)
         .single();
-
+        console.log(yearGroup, yearGroupError, 'ERR')
       if (yearGroupError || !yearGroup) {
         return res.status(400).json({ error: 'Invalid year group ID' });
       }

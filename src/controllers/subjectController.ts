@@ -322,13 +322,13 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
 >>>>>>> Stashed changes
 };
 
-// Get eligible year groups for a student based on their current enrollment year
+// Get eligible year groups for a student based on their enrollment history
 export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    // Get student's current year group and enrollment date using auth user ID
+    // Get student's enrollment details using auth user ID
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('current_year_group_id, created_at')
+      .select('enrolled_year_group_id, current_year_group_id, created_at')
       .eq('auth_user_id', req.user.userId)
       .single();
 
@@ -336,8 +336,8 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
       return res.status(404).json({ error: 'Student not found' });
     }
 
-    if (!student.current_year_group_id) {
-      return res.status(400).json({ error: 'Student does not have a current year group assigned' });
+    if (!student.enrolled_year_group_id || !student.current_year_group_id) {
+      return res.status(400).json({ error: 'Student does not have proper year group assignments' });
     }
 
     // Get all year groups with their subjects in a single query
@@ -345,7 +345,7 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
       .from('year_groups')
       .select(`
         *,
-        year_group_s                       ubject (
+        year_group_subject (
           subjects (
             id,
             name,
@@ -360,16 +360,16 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
       throw yearGroupsError;
     }
 
-    // Determine eligible year groups based on enrollment logic
-    // Students can see all year groups from EYFS (id=1) up to their current year group
-    // This handles both scenarios:
-    // 1. Student enrolled in EYFS and upgraded to Year 2 -> sees EYFS, Year 1, Year 2
-    // 2. Student directly enrolled in Year 2 -> sees EYFS, Year 1, Year 2 (same result)
+    // Determine eligible year groups based on enrollment history
+    // Students can only see year groups from their enrolled year up to their current year
+    // Example: Student enrolled in Year 2, now in Year 5 -> sees Year 2, 3, 4, 5
+    const enrolledYearId = student.enrolled_year_group_id;
+    const currentYearId = student.current_year_group_id;
+
     const eligibleYearGroupsWithSubjects = allYearGroupsWithSubjects
       .filter((yearGroup: any) => {
-        // EYFS is id=1, Year 1 is id=2, Year 2 is id=3, etc.
-        // Students can access all years from EYFS up to their current year
-        return yearGroup.id >= 1 && yearGroup.id <= student.current_year_group_id;
+        // Students can access all years from their enrolled year up to their current year
+        return yearGroup.id >= enrolledYearId && yearGroup.id <= currentYearId;
       })
       .map((yearGroup: any) => {
         // Extract subjects from the joined data and filter only active subjects
@@ -389,6 +389,7 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
     res.status(200).json({ 
       success: true, 
       data: eligibleYearGroupsWithSubjects,
+      studentEnrolledYear: student.enrolled_year_group_id,
       studentCurrentYear: student.current_year_group_id,
       studentEnrollmentDate: student.created_at
     });

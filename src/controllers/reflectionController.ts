@@ -188,7 +188,7 @@ export const fetchActiveTopics = async (req: AuthenticatedRequest, res: Response
       .from("reflection_topics")
       .select("id, title")
       .eq("is_active", true)
-      .not("id", "in", `(${reflectedTopicIds.join(",") || "NULL"})`);
+
 
     if (error) throw error;
 
