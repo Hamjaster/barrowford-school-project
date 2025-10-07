@@ -5,7 +5,7 @@ A comprehensive backend system for a UK primary school portal built with Node.js
 ## Features 
 
 - **Multi-role Authentication System**: Admin, Staff/Teacher, Parent, and Student roles
-- **JWT-based Authentication**: Secure token-based authentication with refresh tokens
+- **JWT-based Authentication**: Secure token-based authentication with refresh tokens 
 - **Role-based Access Control**: Granular permissions based on user roles
 - **Password Management**: Secure password hashing, reset functionality, and validation
 - **Email Integration**: Welcome emails, password reset notifications

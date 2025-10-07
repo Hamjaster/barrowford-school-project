@@ -241,8 +241,6 @@ export const getSubjectsByYearGroup = async (req: Request, res: Response) => {
     console.error('Error fetching subjects by year group:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-<<<<<<< Updated upstream
-=======
 };
 
 // Get eligible year groups for a student based on their current enrollment year
@@ -268,7 +266,7 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
       .from('year_groups')
       .select(`
         *,
-        year_group_s                       ubject (
+        year_group_subjects (
           subjects (
             id,
             name,
