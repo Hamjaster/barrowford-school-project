@@ -2,7 +2,7 @@ import { AuthenticatedRequest, checkPermission } from "../middleware/auth.js";
 import { Response } from "express";
 import { supabase } from "../db/supabase.js";
 import { canManageRole, getManageableRoles, getRoleTable, canManageUsers, UserRole } from "../utils/roleUtils.js";
-import { logAudit, findUserByAuthUserId, getChildrenOfParent, cleanupStudentOnDeactivation, handleParentDeactivation, handleParentActivation } from "../utils/lib.js";
+import { logAudit, findUserByAuthUserId, getChildrenOfParent, cleanupStudentOnDeactivation, handleParentDeactivation, handleParentActivation, formatRole } from "../utils/lib.js";
 
 export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
   try {
