@@ -48,10 +48,11 @@ export const getStudentDetails = async (req: AuthenticatedRequest, res: Response
       data: {
         name: fullName,
         age,
-        year: student.year_group_id,
-        class: className,
-        hairColor: student.hair_color,
-        eyeColor: null, // 👈 not present in your table
+        year_group_id: student.year_group_id,
+        class_id: student.class_id,
+        class_name: className,
+        hair_color : student.hair_color,
+        eye_color: null, // 👈 not present in your table
         height: student.height,
         profile_photo:student.profile_photo
       },

@@ -338,6 +338,7 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
         content,
         status: 'pending_updation',
         
+        
       })
       .eq('id', id)
       .eq('student_id', student.id)
@@ -364,8 +365,19 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
       })
       .select()
       .single();
+
+
     
     if (modErr) throw modErr;
+      
+      //update that personal section and pass moderation_id to it
+      const { error: updateErr } = await supabase
+        .from('personal_sections')
+        .update({ moderation_id: moderation.id })
+        .eq('id', id)
+        .eq('student_id', student.id);
+        
+      if (updateErr) throw updateErr;
 
     res.status(200).json({ success: true, message: 'Personal section update submitted for moderation', data });
   } catch (err: any) {

@@ -2,7 +2,7 @@ import { AuthenticatedRequest, checkPermission } from "../middleware/auth.js";
 import { Response } from "express";
 import { supabase } from "../db/supabase.js";
 import { canManageRole, getManageableRoles, getRoleTable, canManageUsers, UserRole } from "../utils/roleUtils.js";
-import { logAudit, findUserByAuthUserId, getChildrenOfParent, cleanupStudentOnDeactivation, handleParentDeactivation, handleParentActivation } from "../utils/lib.js";
+import { logAudit, findUserByAuthUserId, getChildrenOfParent, cleanupStudentOnDeactivation, handleParentDeactivation, handleParentActivation, formatRole } from "../utils/lib.js";
 
 export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -88,7 +88,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
             email: u.email,
             first_name: u.first_name,
             last_name: u.last_name,
-            role: formatRole(allowedRole),
+            role:allowedRole,
             created_at: u.created_at,
             status: u.status,
           }))
@@ -137,8 +137,8 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
 export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { action, role, userId } = req.body; // 'activate' | 'deactivate'
+    console.log(action, role, userId, 'params');
     
-    console.log(role, userId, 'params')
     if (!['activate', 'deactivate'].includes(action)) {
       return res.status(400).json({ error: 'Invalid action' });
     }
@@ -157,7 +157,7 @@ export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response)
     if (role === 'student' && action === 'activate') {
       // Get student's parents through the relationship table
       const { data: parentRelationships, error: relationshipError } = await supabase
-        .from('parent_student_relationship')
+        .from('parent_student_relationships')
         .select(`
           parent:parents (
             id,

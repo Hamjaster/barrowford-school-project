@@ -144,7 +144,7 @@ export const updateStudentProfile = async (req: any, res: any) => {
 
     if (error) throw error;
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: "Student profile updated successfully",
       data,
@@ -187,7 +187,7 @@ export const getTeacherProfile = async (req: AuthenticatedRequest, res: Response
       }
     }
 
-    res.json({
+    res.status(200).json({
       success: true,
       teacher: {
         ...teacher,

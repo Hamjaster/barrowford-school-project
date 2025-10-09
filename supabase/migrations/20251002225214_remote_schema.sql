@@ -502,7 +502,7 @@ CREATE TABLE IF NOT EXISTS "public"."students" (
     "username" "text" NOT NULL,
     "email" "text" NOT NULL,
     "status" "text" DEFAULT 'active'::"text",
-    "current_year_group_id" bigint DEFAULT '1'::bigint NOT NULL,
+    "year_group_id" bigint DEFAULT '1'::bigint NOT NULL,
     CONSTRAINT "students_status_check" CHECK (("status" = ANY (ARRAY['active'::"text", 'inactive'::"text"])))
 );
 
@@ -995,7 +995,7 @@ ALTER TABLE ONLY "public"."students"
 
 
 ALTER TABLE ONLY "public"."students"
-    ADD CONSTRAINT "students_current_year_group_id_fkey" FOREIGN KEY ("current_year_group_id") REFERENCES "public"."year_groups"("id");
+    ADD CONSTRAINT "students_year_group_id_fkey" FOREIGN KEY ("year_group_id") REFERENCES "public"."year_groups"("id");
 
 
 

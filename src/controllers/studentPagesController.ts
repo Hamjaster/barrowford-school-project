@@ -189,8 +189,8 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
 // fetch my impacts
 export const getMyImpacts = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { data: student } = await getStudentRecord(req.user.userId);
-    if (!student) return res.status(404).json({ error: 'Student not found' });
+    const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
+    if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
     
     // find page_type_id for impacts
     const { data: pageType, error: pageTypeError } = await supabase
@@ -209,8 +209,45 @@ export const getMyImpacts = async (req: AuthenticatedRequest, res: Response) => 
       .eq('page_type_id', pageType.id)
       .single();
 
-    if (error && error.code !== 'PGRST116') throw error; // ignore "no rows found"
-    res.status(200).json({ success: true, data: data ? data : "" });
+    if (error && error.code === 'PGRST116') {
+      const dummyContent = {"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null},"content":[{"type":"text","text":"Start typing here..."}]}]}
+      // No record found, create a new one with empty content
+      const { data: newRecord, error: createError } = await supabase
+      .from('student_pages')
+      .insert({
+        student_id: student.id,
+        year_group_id: student.year_group_id,
+        page_type_id: pageType.id,
+        // wrap in back ticks
+        content: `{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null},"content":[{"type":"text","text":"Start typing here..."}]}]}`
+      })
+      .select('id, content, created_at')
+      .single();
+      console.log('no found so creating a new one', newRecord, createError);
+    
+      if (createError) throw createError;
+
+      // Get actual user ID for audit log
+      const user = await findUserByAuthUserId(req.user.userId);
+      if (!user) throw new Error('User not found');
+
+      // Log audit for the creation
+      await logAudit({
+        action: 'create',
+        entityType: 'student_pages',
+        entityId: newRecord.id,
+        oldValue: null,
+        newValue: newRecord,
+        actorId: user.id,
+        actorRole: req.user.role
+      });
+
+      res.status(200).json({ success: true, data: newRecord });
+    } else if (error) {
+      throw error;
+    } else {
+      res.status(200).json({ success: true, data });
+    }
   } catch (err: any) {
     console.error('Error fetching impacts:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -220,8 +257,8 @@ export const getMyImpacts = async (req: AuthenticatedRequest, res: Response) => 
 // fetch my experiences
 export const getMyExperiences = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { data: student } = await getStudentRecord(req.user.userId);
-    if (!student) return res.status(404).json({ error: 'Student not found' });
+    const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
+    if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
     
     // find page_type_id for experiences
     const { data: pageType, error: pageTypeError } = await supabase
@@ -240,8 +277,42 @@ export const getMyExperiences = async (req: AuthenticatedRequest, res: Response)
       .eq('page_type_id', pageType.id)
       .single();
 
-    if (error && error.code !== 'PGRST116') throw error;
-    res.status(200).json({ success: true, data: data ? data : "" });
+    if (error && error.code === 'PGRST116') {
+      // No record found, create a new one with empty content
+      const { data: newRecord, error: createError } = await supabase
+        .from('student_pages')
+        .insert({
+          student_id: student.id,
+          year_group_id: student.year_group_id,
+          page_type_id: pageType.id,
+          content: `{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null},"content":[{"type":"text","text":"Start typing here..."}]}]}`
+        })
+        .select('id, content, created_at')
+        .single();
+
+      if (createError) throw createError;
+
+      // Get actual user ID for audit log
+      const user = await findUserByAuthUserId(req.user.userId);
+      if (!user) throw new Error('User not found');
+
+      // Log audit for the creation
+      await logAudit({
+        action: 'create',
+        entityType: 'student_pages',
+        entityId: newRecord.id,
+        oldValue: null,
+        newValue: newRecord,
+        actorId: user.id,
+        actorRole: req.user.role
+      });
+
+      res.status(200).json({ success: true, data: newRecord });
+    } else if (error) {
+      throw error;
+    } else {
+      res.status(200).json({ success: true, data });
+    }
   } catch (err: any) {
     console.error('Error fetching experiences:', err);
     res.status(500).json({ error: 'Internal server error' });

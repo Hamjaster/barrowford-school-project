@@ -559,11 +559,17 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
 
         if (personalSectionUpdateErr) throw personalSectionUpdateErr;
       } else if (mod.action_type === 'update') {
+
         // Rejecting update - revert status back to 'approved'
+        const { data: moderation, error: moderationError } = await supabase.from('moderations').select('old_content').eq('id', mod.id).single();
+        console.log(moderation, 'moderation ! to reject');
+        if (moderationError) throw moderationError;
+
         const { error: personalSectionUpdateErr } = await supabase
           .from('personal_sections')
           .update({ 
-            status: 'approved'
+            status: 'approved',
+            content: moderation.old_content.content
           })
           .eq('id', mod.entity_id);
 

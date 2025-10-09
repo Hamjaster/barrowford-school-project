@@ -88,9 +88,8 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
           .from(table)
           .insert({
             auth_user_id: additionalData.auth_user_id,
-            year_group_id: additionalData.year_group_id || null,
+            year_group_id: additionalData.year_group_id,
             class_id: additionalData.class_id || null,
-            current_year_group_id: additionalData.current_year_group_id,
             username: additionalData.username,
             email: additionalData.email,
             first_name: additionalData.first_name,
@@ -203,7 +202,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       year_group_id,
       class_id,
       profile_photo,
-      current_year_group_id // for students - enrollment year
+      
     } = req.body;
 
     const creatorRole = req.user.role;
@@ -260,7 +259,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       parentDataList = fetchedParents;
 
       // Validate current_year_group_id for students
-      if (!current_year_group_id) {
+      if (!year_group_id) {
         return res.status(400).json({ error: 'Current year group ID is required for student accounts' });
       }
 
@@ -268,7 +267,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       const { data: yearGroup, error: yearGroupError } = await supabase
         .from('year_groups')
         .select('id, name')
-        .eq('id', current_year_group_id)
+        .eq('id', year_group_id)
         .single();
         console.log(yearGroup, yearGroupError, 'ERR')
       if (yearGroupError || !yearGroup) {
@@ -323,7 +322,6 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
           auth_user_id: authData.user.id,
           year_group_id,
           class_id,
-          current_year_group_id,
           parent_ids,
           username,
         };
@@ -534,7 +532,7 @@ export const resetPassword = async (req: Request, res: Response) => {
       });
     }
 
-    res.json({ 
+    res.status(200).json({ 
       success: true,
       message: 'Password has been reset successfully'
     });
@@ -595,7 +593,7 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
       });
     }
 
-    res.json({ 
+    res.status(200).json({ 
       success: true,
       message: `Password for ${targetUser.email} has been reset successfully`
     });

@@ -154,7 +154,7 @@ export const getChildrenOfParent = async (parentId: number) : Promise<any[]> => 
   try {
  // Find all children (students) linked with this parent - only active students
  const { data: children, error: childrenError } = await supabase
- .from('parent_student_relationship')
+ .from('parent_student_relationships')
  .select(`
    student:students (id, first_name, last_name, username, year_group_id, class_id, created_at, status)
  `)
@@ -177,13 +177,23 @@ console.log(studentObjects, 'all STUDENTS !')
 // Clean up student moderations and entities when student is deactivated
 export const cleanupStudentOnDeactivation = async (studentId: number) => {
   try {
-    // 1. Delete all moderations submitted by this student
+    // 1. Delete all moderations submitted by this student, 
+    // Expect the moderations that are of personal_sections are pending whose action type is update
+    
     const { error: deleteModerationsError } = await supabase
       .from('moderations')
       .delete()
-      .eq('student_id', studentId);
+      .eq('status','pending')
+      .eq('student_id', studentId)
+      .not('action_type', 'eq', 'update')
+      .not('entity_type', 'eq', 'personal_sections'); // since, currently only personal_sections are coming with update action
 
-    if (deleteModerationsError) throw deleteModerationsError;
+      
+      if (deleteModerationsError) {
+        console.log('error deleting moderations !', deleteModerationsError)
+        throw deleteModerationsError;
+      };
+      console.log('moderations deleted !')
 
     // 2. Handle student entities based on their status
     // Get all student entities (images, learnings, reflections, personal_sections)
@@ -196,7 +206,7 @@ export const cleanupStudentOnDeactivation = async (studentId: number) => {
         .select('*')
         .eq('student_id', studentId)
         .in('status', ['pending', 'pending_deletion', 'pending_updation']);
-      console.log('all of the entities! :', entities)
+
       if (entitiesError) throw entitiesError;
 
       for (const entity of entities) {
@@ -221,26 +231,35 @@ export const cleanupStudentOnDeactivation = async (studentId: number) => {
           
           if (revertError) throw revertError;
         } else if (entity.status === 'pending_updation') {
+          console.log("WORKING ON PENDING UPDATION !", 'entity :-', entity)
           // find the respective moderation record
           const { data: moderation , error: moderationError } = await supabase
             .from('moderations')
             .select('*')
-            .eq('entity_id', entity.id)
-            .eq('entity_type', entityType)
-            .eq('action_type', 'update')
+            .eq('id', entity.moderation_id)
             .single()
-
-          if (moderationError) throw moderationError;
-            console.log(moderation.old_content, 'moderation old content !');
-          const { error: revertUpdateError } = await supabase
+          console.log('ENTITY to test :-!! ', entity)
+            const { error: revertUpdateError } = await supabase
             .from(entityType)
             .update({ 
               status: 'approved',
-              content: moderation.old_content.content
+              content: moderation.old_content.content,
+              moderation_id: null // De-link the moderation from the entity
             })
             .eq('id', entity.id);
+            console.log('de-link and entity update done !')
           
           if (revertUpdateError) throw revertUpdateError;
+
+
+            // Now delete the moderation
+            const { error: deleteModerationError } = await supabase.from('moderations').delete().eq('id', entity.moderation_id);
+            console.log('moderation deleted !')
+            if (deleteModerationError) throw deleteModerationError;
+           
+          if (moderationError) throw moderationError;
+            console.log(moderation.old_content, 'moderation old content !');
+         
         }
       }
     }
