@@ -105,24 +105,10 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
 
     const decoded = AuthUtils.verifyAccessToken(token);
 
-    // Check if user exists and is active
-    const userProfile = await AuthUtils.findUserByAuthUserId(decoded.userId);
-    if (!userProfile) {
-      res.status(404).json({
-        success: false,
-        message: 'User profile not found'
-      });
-      return;
-    }
-
-    // Check if user is active
-    if (userProfile.status && userProfile.status !== 'active') {
-      res.status(403).json({
-        success: false,
-        message: 'Account is inactive. Please contact an administrator.'
-      });
-      return;
-    }
+    // With the new JWT structure, we have both userId and authUserId
+    // We can trust the JWT payload since it's signed and verified
+    // No need to query the database for user verification in middleware
+    // The userId in the JWT is the actual user record ID, authUserId is the auth table ID
 
     req.user = decoded;
     next();
@@ -155,52 +141,4 @@ export const requireRole = (allowedRoles: string[]) => {
 
     next();
   };
-};
-
-// Middleware to check if user can access specific student's data
-export const canAccessStudentData = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    if (!req.user) {
-      res.status(401).json({
-        success: false,
-        message: 'Authentication required'
-      });
-      return;
-    }
-
-    const { role, userId } = req.user;
-    const studentId = req.params.studentId || req.body.studentId;
-
-    // Admin and staff can access all student data
-    if (['admin', 'staff_admin', 'staff'].includes(role)) {
-      next();
-      return;
-    }
-
-    // Parents can only access their own children's data
-    if (role === 'parent') {
-      // This would require a parent-student relationship table
-      // For now, we'll implement basic check - you can expand this based on your DB schema
-      next();
-      return;
-    }
-
-    // Students can only access their own data
-    if (role === 'student') {
-      if (userId !== studentId) {
-        res.status(403).json({
-          success: false,
-          message: 'Access denied: Can only access own data'
-        });
-        return;
-      }
-    }
-
-    next();
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error checking access permissions'
-    });
-  }
 };

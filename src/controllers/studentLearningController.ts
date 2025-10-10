@@ -4,11 +4,11 @@ import { AuthenticatedRequest } from '../middleware/auth.js';
 import { getTeacherRecordFromClass } from '../utils/lib.js';
 
 // helper to fetch student
-const getStudentRecord = async (authUserId: string) => {
+const getStudentRecord = async (userId: string) => {
   return await supabase
     .from('students')
     .select('*')
-    .eq('auth_user_id', authUserId)
+    .eq('id', userId)
     .single();
 };
 

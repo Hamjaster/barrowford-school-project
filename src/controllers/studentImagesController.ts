@@ -1,14 +1,14 @@
 import { Response } from 'express';
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
-import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
+import { logAudit } from '../utils/lib.js';
 
 // helper: fetch student record
-const getStudentRecord = async (authUserId: string) => {
+const getStudentRecord = async (userId: string) => {
   return await supabase
     .from('students')
     .select('id, year_group_id')
-    .eq('auth_user_id', authUserId)
+    .eq('id', userId)
     .single();
 };
 
@@ -26,7 +26,7 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('*')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
     if (studentError || !student) return res.status(404).json({ error: 'Student not found' });
     
@@ -134,7 +134,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
     const { data: studentRow, error: studentErr } = await supabase
       .from('students')
       .select('*')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
     if (studentErr || !studentRow) return res.status(404).json({ error: 'Student not found' });
 
@@ -253,8 +253,7 @@ export const deletestudent_images = async (req: AuthenticatedRequest, res: Respo
     if (deleteError) throw deleteError;
 
     // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // userId in JWT is the actual user record ID
 
     // Log audit for delete action
     await logAudit({
@@ -263,7 +262,7 @@ export const deletestudent_images = async (req: AuthenticatedRequest, res: Respo
       entityId: id,
       oldValue: oldData,
       newValue: null,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 

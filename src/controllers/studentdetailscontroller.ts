@@ -10,12 +10,13 @@ export const getStudentDetails = async (req: AuthenticatedRequest, res: Response
     }
 
     console.log("🔍 userId from token:", req.user.userId);
+    console.log(req.user, 'req.user');
 
     // 1️⃣ Fetch student record
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('id, first_name, last_name, dob, year_group_id, class_id, hair_color, height,profile_photo')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
 
     if (studentError || !student) {

@@ -11,7 +11,7 @@ export const getMyChildren = async (req: AuthenticatedRequest, res: Response) =>
     const { data: parent, error: parentError } = await supabase
       .from('parents')
       .select('id')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
 
     if (parentError || !parent) return res.status(404).json({ error: 'Parent record not found' });
@@ -20,7 +20,7 @@ export const getMyChildren = async (req: AuthenticatedRequest, res: Response) =>
     const { data: children, error: childrenError } = await supabase
       .from('parent_student_relationships')
       .select(`
-        student:students (id, first_name, last_name, username, year_group_id, class_id, created_at, status)
+        student:students (id, first_name, last_name, username, year_group_id, class_id, created_at, status, profile_photo )
       `)
       .eq('parent_id', parent.id);
 
@@ -48,7 +48,7 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
     const { data: parent, error: parentError } = await supabase
       .from('parents')
       .select('id')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
 
     if (parentError || !parent) return res.status(404).json({ error: 'Parent record not found' });

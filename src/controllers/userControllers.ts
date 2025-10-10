@@ -2,12 +2,12 @@ import { AuthenticatedRequest, checkPermission } from "../middleware/auth.js";
 import { Response } from "express";
 import { supabase } from "../db/supabase.js";
 import { canManageRole, getManageableRoles, getRoleTable, canManageUsers, UserRole } from "../utils/roleUtils.js";
-import { logAudit, findUserByAuthUserId, getChildrenOfParent, cleanupStudentOnDeactivation, handleParentDeactivation, handleParentActivation, formatRole } from "../utils/lib.js";
+import { logAudit, getChildrenOfParent, cleanupStudentOnDeactivation, handleParentDeactivation, handleParentActivation, formatRole } from "../utils/lib.js";
 
 export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const creatorRole = req.user.role;
-    const creatorUserId = req.user.userId;
+    const creatorUserId = req.user.authUserId;
 
     const {
       page = 1,
@@ -197,8 +197,7 @@ export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response)
     if (error) throw error;
 
     // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // userId in JWT is the actual user record ID
 
     // Log audit for status change
     await logAudit({
@@ -207,7 +206,7 @@ export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response)
       entityId: userId,
       oldValue: oldData,
       newValue: newData,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -248,7 +247,7 @@ export const toggleUserStatus = async (req: AuthenticatedRequest, res: Response)
           entityId: child.id,
           oldValue: { ...child, status: child.status },
           newValue: { ...child, status: newStatus },
-          actorId: user.id,
+          actorId: req.user.userId,
           actorRole: req.user.role
         });
       }
@@ -336,8 +335,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // userId in JWT is the actual user record ID
 
     // Log audit for delete action
     await logAudit({
@@ -346,7 +344,7 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
       entityId: userId,
       oldValue: userData,
       newValue: null,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 

@@ -13,7 +13,7 @@ export const createReflectioTopic = async (req:AuthenticatedRequest,res : Respon
         const { data: staff, error: staffError } = await supabase
         .from("staffs")
         .select("id")
-        .eq("auth_user_id", req.user.userId)  // req.user.userId should be UUID
+        .eq("auth_user_id", req.user.authUserId)  // req.user.userId should be UUID
         .single();
 
         
@@ -158,7 +158,7 @@ export const fetchActiveTopics = async (req: AuthenticatedRequest, res: Response
     const { data: student, error: studentError } = await supabase
       .from("students")
       .select("id, status")
-      .eq("auth_user_id", req.user.userId)
+      .eq("auth_user_id", req.user.authUserId)
       .single();
 
     if (studentError || !student) {
@@ -214,7 +214,7 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('id, year_group_id, class_id')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .maybeSingle()
 
     if (studentError || !student) {
@@ -265,8 +265,12 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
         week: weekLabel,
         status: 'pending'
       })
-      .select()
+      .select(
+        'id,student_id, year_group_id, created_at,topic_id, content, attachment_url, week, status, reflection_topics!inner(title)'
+      )
       .single();
+
+ 
 
     if (reflectionError) throw reflectionError;
 
@@ -378,7 +382,7 @@ export const fetchStudentReflections = async (req: AuthenticatedRequest, res: Re
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('id, status')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
 
     if (studentError || !student) {
@@ -480,7 +484,7 @@ export const UpdateReflectionFromStudent = async (
     const { data: student, error: studentError } = await supabase
       .from("students")
       .select("id")
-      .eq("auth_user_id", req.user.userId)
+      .eq("auth_user_id", req.user.authUserId)
       .single();
 
     if (studentError || !student) {
@@ -536,8 +540,8 @@ export const addComment = async(req:AuthenticatedRequest,res:Response)=>{
 
   // Fetch user id and name using auth_user_id (UUID from Supabase Auth)
   const [staffRes, parentRes] = await Promise.all([
-  supabase.from("staffs").select("id, first_name, last_name").eq("auth_user_id", req.user.userId).maybeSingle(),
-  supabase.from("parents").select("id, first_name, last_name").eq("auth_user_id", req.user.userId).maybeSingle(),
+  supabase.from("staffs").select("id, first_name, last_name").eq("auth_user_id", req.user.authUserId).maybeSingle(),
+  supabase.from("parents").select("id, first_name, last_name").eq("auth_user_id", req.user.authUserId).maybeSingle(),
     ]);
 
     let user_id: number | null = null;
@@ -660,7 +664,7 @@ export const requestDeleteReflection = async (req: AuthenticatedRequest, res: Re
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('id, year_group_id, class_id')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
 
     if (studentError || !student) {

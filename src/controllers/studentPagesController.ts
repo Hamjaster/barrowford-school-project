@@ -1,14 +1,14 @@
 import { Response } from 'express';
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
-import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
+import { logAudit } from '../utils/lib.js';
 
 // helper: fetch student record
-const getStudentRecord = async (authUserId: string) => {
+const getStudentRecord = async (userId: string) => {
   return await supabase
     .from('students')
     .select('id, year_group_id')
-    .eq('auth_user_id', authUserId)
+    .eq('id', userId)
     .single();
 };
 
@@ -77,9 +77,7 @@ export const updateImpact = async (req: AuthenticatedRequest, res: Response) => 
       isCreate = false;
     }
 
-    // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // userId in JWT is the actual user record ID
 
     // Log audit
     await logAudit({
@@ -88,7 +86,7 @@ export const updateImpact = async (req: AuthenticatedRequest, res: Response) => 
       entityId: data.id,
       oldValue: isCreate ? null : existingRecord,
       newValue: data,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -164,9 +162,7 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
       isCreate = false;
     }
 
-    // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // userId in JWT is the actual user record ID
 
     // Log audit
     await logAudit({
@@ -175,7 +171,7 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
       entityId: data.id,
       oldValue: isCreate ? null : existingRecord,
       newValue: data,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -227,10 +223,7 @@ export const getMyImpacts = async (req: AuthenticatedRequest, res: Response) => 
     
       if (createError) throw createError;
 
-      // Get actual user ID for audit log
-      const user = await findUserByAuthUserId(req.user.userId);
-      if (!user) throw new Error('User not found');
-
+     
       // Log audit for the creation
       await logAudit({
         action: 'create',
@@ -238,7 +231,7 @@ export const getMyImpacts = async (req: AuthenticatedRequest, res: Response) => 
         entityId: newRecord.id,
         oldValue: null,
         newValue: newRecord,
-        actorId: user.id,
+        actorId: req.user.userId,
         actorRole: req.user.role
       });
 
@@ -292,9 +285,6 @@ export const getMyExperiences = async (req: AuthenticatedRequest, res: Response)
 
       if (createError) throw createError;
 
-      // Get actual user ID for audit log
-      const user = await findUserByAuthUserId(req.user.userId);
-      if (!user) throw new Error('User not found');
 
       // Log audit for the creation
       await logAudit({
@@ -303,7 +293,7 @@ export const getMyExperiences = async (req: AuthenticatedRequest, res: Response)
         entityId: newRecord.id,
         oldValue: null,
         newValue: newRecord,
-        actorId: user.id,
+        actorId: req.user.userId,
         actorRole: req.user.role
       });
 

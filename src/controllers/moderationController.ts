@@ -1,7 +1,7 @@
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { Response } from 'express';
-import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
+import { logAudit } from '../utils/lib.js';
 
 // List pending moderations (with optional filters: entity_type, student_id)
 export const listPendingModerations = async (req: AuthenticatedRequest, res: Response) => {
@@ -15,7 +15,7 @@ export const listPendingModerations = async (req: AuthenticatedRequest, res: Res
       const { data: teacher, error: teacherError } = await supabase
         .from('staffs')
         .select('year_group_id, class_id')
-        .eq('auth_user_id', req.user.userId)
+        .eq('auth_user_id', req.user.authUserId)
         .single();
 
       if (teacherError || !teacher) {
@@ -104,7 +104,7 @@ export const getModerationById = async (req: AuthenticatedRequest, res: Response
 // Approve moderation
 export const approveModeration = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const teacherAuthUserId = req.user.userId;
+    const teacherAuthUserId = req.user.authUserId;
 
     // find teacher record (teacher id)
     const { data: teacherRow, error: teacherErr } = await supabase
@@ -437,7 +437,7 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
 // Reject moderation
 export const rejectModeration = async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const teacherAuthUserId = req.user.userId;
+    const teacherAuthUserId = req.user.authUserId;
     const { data: teacherRow } = await supabase
       .from('staffs')
       .select('id')

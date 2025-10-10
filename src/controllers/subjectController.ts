@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
-import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
+import { logAudit } from '../utils/lib.js';
 
 // FOR MANAGERS (admin, staff, staff_admin)
 export const createSubject = async (req: AuthenticatedRequest, res: Response) => {
@@ -18,8 +18,7 @@ export const createSubject = async (req: AuthenticatedRequest, res: Response) =>
     if (error) throw error;
     
     // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // userId in JWT is the actual user record ID
     
     // Log audit for create action
     await logAudit({
@@ -28,7 +27,7 @@ export const createSubject = async (req: AuthenticatedRequest, res: Response) =>
       entityId: data.id,
       oldValue: null,
       newValue: data,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -63,8 +62,7 @@ export const updateSubject = async (req: AuthenticatedRequest, res: Response) =>
     if (error) throw error;
 
     // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // userId in JWT is the actual user record ID
 
     // Log audit for update action
     await logAudit({
@@ -73,7 +71,7 @@ export const updateSubject = async (req: AuthenticatedRequest, res: Response) =>
       entityId: id,
       oldValue: oldData,
       newValue: data,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -105,8 +103,7 @@ export const deleteSubject = async (req: AuthenticatedRequest, res: Response) =>
     if (error) throw error;
 
     // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // userId in JWT is the actual user record ID
 
     // Log audit for delete action
     await logAudit({
@@ -115,7 +112,7 @@ export const deleteSubject = async (req: AuthenticatedRequest, res: Response) =>
       entityId: id,
       oldValue: oldData,
       newValue: null,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -171,8 +168,7 @@ const {status} = req.body;
     if (error) throw error;
 
     // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
+    // userId in JWT is the actual user record ID
 
     // Log audit for status change
     await logAudit({
@@ -181,7 +177,7 @@ const {status} = req.body;
       entityId: id,
       oldValue: oldData,
       newValue: data,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -250,7 +246,7 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('year_group_id, created_at')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
 
     if (studentError || !student) {

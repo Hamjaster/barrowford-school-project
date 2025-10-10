@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
 import { supabase } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
-import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
-const getStudentRecord = async (authUserId: string) => {
+import { logAudit } from '../utils/lib.js';
+const getStudentRecord = async (userId: string) => {
   return await supabase
     .from('students')
     .select('*')
-    .eq('auth_user_id', authUserId)
+    .eq('id', userId)
     .single();
 };
 
@@ -34,18 +34,15 @@ export const createPersonalSectionTopic = async (req: AuthenticatedRequest, res:
 
     if (error) throw error;
     
-    // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
-    
     // Log audit for create action
+    // userId in JWT is the actual user record ID
     await logAudit({
       action: 'create',
       entityType: 'personal_section_topics',
       entityId: data.id,
       oldValue: null,
       newValue: data,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -91,18 +88,15 @@ export const updatePersonalSectionTopic = async (req: AuthenticatedRequest, res:
 
     if (error) throw error;
 
-    // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
-
     // Log audit for update action
+    // userId in JWT is the actual user record ID
     await logAudit({
       action: 'update',
       entityType: 'personal_section_topics',
       entityId: id,
       oldValue: oldData,
       newValue: data,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role,
     });
 
@@ -133,18 +127,15 @@ export const deletePersonalSectionTopic = async (req: AuthenticatedRequest, res:
 
     if (error) throw error;
 
-    // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
-
     // Log audit for delete action
+    // userId in JWT is the actual user record ID
     await logAudit({
       action: 'delete',
       entityType: 'personal_section_topics',
       entityId: id,
       oldValue: oldData,
       newValue: null,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -214,18 +205,15 @@ const {status} = req.body;
 
     if (error) throw error;
 
-    // Get actual user ID for audit log
-    const user = await findUserByAuthUserId(req.user.userId);
-    if (!user) throw new Error('User not found');
-
     // Log audit for status change
+    // userId in JWT is the actual user record ID
     await logAudit({
       action: 'update',
       entityType: 'personal_section_topics',
       entityId: id,
       oldValue: oldData,
       newValue: data,
-      actorId: user.id,
+      actorId: req.user.userId,
       actorRole: req.user.role
     });
 
@@ -476,7 +464,7 @@ export const getMypersonal_sections = async (req: AuthenticatedRequest, res: Res
     const { data: student, error: studentError } = await supabase
       .from('students')
       .select('id')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
 
     if (studentError || !student) {

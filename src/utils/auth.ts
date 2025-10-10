@@ -6,9 +6,10 @@ import { UserRole } from '../types.js';
 import { supabase } from '../db/supabase.js';
 
 export interface JWTPayload {
-  userId: string;
   email?: string | undefined;
   role: UserRole;
+  authUserId: string;
+  userId: string;
   // iat?: number; // Uncomment this when adding expiry to tokens
   // exp?: number;
 }

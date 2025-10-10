@@ -7,6 +7,14 @@ import { sendUserCreationEmail } from '../utils/resend.js';
 import { canManageRole, getRoleTable, isValidRole, UserRole } from '../utils/roleUtils.js';
 import { logAudit, findUserByAuthUserId } from '../utils/lib.js';
 
+const getUserRecord = async (authUserId: string, role: string) => {
+  return await supabase
+    .from(role)
+    .select('*')
+    .eq('auth_user_id', authUserId)
+    .single();
+};
+
 // Helper function to validate role-specific user creation
 const canCreateSpecificRole = (creatorRole: string, targetRole: string) => {
   return canManageRole(creatorRole as UserRole, targetRole as UserRole);
@@ -162,11 +170,12 @@ export const login = async (req: Request, res: Response) => {
       error: 'Account is inactive. Please contact an administrator.'
     });
   }
-
+ 
   const authToken = AuthUtils.generateAccessToken({
-    userId: data.user?.id,
+    userId: userProfile.id,
     role: userProfile.role,
-    email: userProfile.email
+    email: userProfile.email,
+    authUserId: data.user?.id
   });
 
   const response: any = {
@@ -209,7 +218,6 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     let emailToUse = email;
 
     if (role === 'student' && !email) {
-
       emailToUse = username + '@school.com';
     }
 
@@ -334,7 +342,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
         console.log(`${role} entry created successfully`, createdUser);
 
         // Get actual user ID for audit log
-        const user = await findUserByAuthUserId(req.user.userId);
+        const user = await findUserByAuthUserId(req.user.authUserId);
         if (!user) throw new Error('User not found');
 
         // Log audit for user creation

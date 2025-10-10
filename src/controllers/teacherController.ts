@@ -15,7 +15,7 @@ export const getAssignedStudents = async (req: AuthenticatedRequest, res: Respon
     const { data: teacher, error: teacherError } = await supabase
       .from("staffs")
       .select("id, year_group_id, class_id")
-      .eq("auth_user_id", req.user.userId)
+      .eq("auth_user_id", req.user.authUserId)
       .single();
 
     if (teacherError || !teacher) {
@@ -166,7 +166,7 @@ export const getTeacherProfile = async (req: AuthenticatedRequest, res: Response
     const { data: teacher, error: teacherError } = await supabase
       .from('staffs')
       .select('id, year_group_id, class_id, created_at, auth_user_id, first_name, last_name, email, status')
-      .eq('auth_user_id', req.user.userId)
+      .eq('auth_user_id', req.user.authUserId)
       .single();
 
     if (teacherError || !teacher) {
