@@ -4,7 +4,7 @@ import { AuthenticatedRequest } from '../middleware/auth.js';
 import { calculateAcademicWeek, getPreviousWeeks } from '../utils/lib.js';
 
 
-export const createReflectioTopic = async (req:AuthenticatedRequest,res : Response)=>{
+export const createReflectionTopic = async (req:AuthenticatedRequest,res : Response)=>{
     try{
         const { title } = req.body;
         if (!title) return res.status(400).json({ error: 'Title is required' });
@@ -467,69 +467,6 @@ export const UpdateReflection = async (req: AuthenticatedRequest, res: Response)
   }
 };
 
-
-//update reflection from student
-export const UpdateReflectionFromStudent = async (
-  req: AuthenticatedRequest,
-  res: Response
-) => {
-  try {
-    const { id, content, attachmentUrl } = req.body;
-
-    // ✅ Validation
-    if (!id) return res.status(400).json({ error: "Reflection ID is required" });
-    if (!content) return res.status(400).json({ error: "Content is required" });
-
-    // ✅ Find student record
-    const { data: student, error: studentError } = await supabase
-      .from("students")
-      .select("id")
-      .eq("auth_user_id", req.user.authUserId)
-      .single();
-
-    if (studentError || !student) {
-      return res.status(404).json({ error: "Student record not found" });
-    }
-
-    // ✅ Check reflection exists and not approved
-    const { data: reflection, error: reflectionError } = await supabase
-      .from("reflections") // fixed typo: was 'relections'
-      .select("status")
-      .eq("id", id)
-      .eq("student_id", student.id)
-      .single();
-
-    if (reflectionError || !reflection) {
-      return res.status(404).json({ error: "Reflection not found" });
-    }
-
-    if (reflection.status === "approved") {
-      return res
-        .status(403)
-        .json({ error: "Approved reflections cannot be edited" });
-    }
-
-    // ✅ Build update payload
-    const updatePayload: any = { content, status: "pending" };
-    if (attachmentUrl) updatePayload.attachment_url = attachmentUrl;
-
-    // ✅ Update reflection
-    const { data, error } = await supabase
-      .from("reflections")
-      .update(updatePayload)
-      .eq("id", id)
-      .eq("student_id", student.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    res.status(200).json({ success: true, data });
-  } catch (err: any) {
-    console.error("Error updating reflection by student:", err.message || err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
 
 export const addComment = async(req:AuthenticatedRequest,res:Response)=>{
   const {reflectionId,content} = req.body;

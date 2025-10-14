@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { authenticateToken, checkPermission } from '../middleware/auth.js';
-import { createReflectioTopic, fetchActiveTopics,createReflection,fetchAllReflectionsWithTitle,
+import {  fetchActiveTopics,createReflection,fetchAllReflectionsWithTitle,
     fetchStudentReflections,UpdateReflection,addComment,
     fetchComments,fetchReflectionsByStudentId,deleteReflection,requestDeleteReflection,
-    fetchAllTopics, updateTopic, deleteTopic, getPreviousWeeksForUser
+    fetchAllTopics, updateTopic, deleteTopic, getPreviousWeeksForUser,
+    createReflectionTopic
  } from '../controllers/reflectionController.js';
 import upload from '../middleware/multer.js';
 
@@ -11,7 +12,7 @@ import upload from '../middleware/multer.js';
 const router = Router();
 
 // Only admin, staff_admin, staff can manage topics
-router.post('/createtopics',authenticateToken,checkPermission('create-reflection-topic'),createReflectioTopic as any)
+router.post('/createtopics',authenticateToken,checkPermission('create-reflection-topic'),createReflectionTopic  as any)
 router.get('/topics',authenticateToken,checkPermission('fetch-all-topics'),fetchAllTopics as any)
 router.put('/topics/:id',authenticateToken,checkPermission('update-reflection-topic'),updateTopic as any)
 router.delete('/topics/:id',authenticateToken,checkPermission('delete-reflection-topic'),deleteTopic as any)

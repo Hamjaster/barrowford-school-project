@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthUtils, JWTPayload } from '../utils/auth.js';
+import { supabase } from '../db/supabase.js';
 
 // Extend Request interface to include user
 declare global {
@@ -104,6 +105,26 @@ export const authenticateToken = async (req: Request, res: Response, next: NextF
     }
 
     const decoded = AuthUtils.verifyAccessToken(token);
+
+    // CHeck if the the user is a student and if the account is active
+    if (decoded.role === 'student') {
+      const { data: student, error: studentError } = await supabase
+        .from("students")
+        .select("status")
+        .eq("auth_user_id", decoded.authUserId)
+        .single();
+
+      if (studentError || !student) {
+        res.status(404).json({ success : false, error: 'Student record not found' });
+        return;
+      }
+
+      if (student.status && student.status !== 'active') {
+        res.status(403).json({ success : false,error: 'Student account is inactive' });
+        return;
+      }
+    }
+
 
     // With the new JWT structure, we have both userId and authUserId
     // We can trust the JWT payload since it's signed and verified

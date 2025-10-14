@@ -16,6 +16,7 @@ import teacherRoutes from './routes/teacher.js';
 import parentRoutes from './routes/parent.js';
 import reflectionRouter from './routes/reflection.js'
 import moderationRoutes from './routes/moderation.js';
+import studentBulkRoutes from './routes/studentBulk.js';
 
 
 const app = express();
@@ -53,6 +54,7 @@ app.use('/api/teacher', teacherRoutes);
 app.use('/api/parent', parentRoutes);
 app.use('/api/reflection',reflectionRouter)
 app.use('/api/moderation', moderationRoutes);
+app.use('/api/student-bulk', studentBulkRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
