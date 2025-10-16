@@ -17,6 +17,7 @@ import parentRoutes from './routes/parent.js';
 import reflectionRouter from './routes/reflection.js'
 import moderationRoutes from './routes/moderation.js';
 import studentBulkRoutes from './routes/studentBulk.js';
+import assignmentRoutes from './routes/assignment.js';
 
 
 const app = express();
@@ -55,6 +56,7 @@ app.use('/api/parent', parentRoutes);
 app.use('/api/reflection',reflectionRouter)
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/student-bulk', studentBulkRoutes);
+app.use('/api/assignment', assignmentRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
