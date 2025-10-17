@@ -204,6 +204,22 @@ export const getAllyear_groups = async (req: Request, res: Response) => {
   }
 };
 
+// Get all classes
+export const getAllClasses = async (req: Request, res: Response) => {
+  try {
+    const { data, error } = await supabase
+      .from('classes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.status(200).json({ success: true, data });
+  } catch (err: any) {
+    console.error('Error fetching classes:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Get all subjects under a specific year group
 export const getSubjectsByYearGroup = async (req: Request, res: Response) => {
   try {

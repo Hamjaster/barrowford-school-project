@@ -93,8 +93,8 @@ export const updateStudentProfile = async (req: any, res: any) => {
       profile_photo,
       first_name,
       last_name,
-      year_group_id,
-      class_name,
+      current_year_group_id,
+      class_id,
       hair_color,
       height,
     } = req.body;
@@ -107,26 +107,11 @@ export const updateStudentProfile = async (req: any, res: any) => {
 
     const updateData: Record<string, any> = {};
 
-    // ✅ If class_name is provided, look up its class_id from classes table
-    if (class_name) {
-      const { data: classRecord, error: classError } = await supabase
-        .from("classes")
-        .select("id")
-        .eq("name", class_name)
-        .single();
-
-      if (classError || !classRecord) {
-        return res.status(400).json({ error: "Invalid class name provided" });
-      }
-
-      updateData.class_id = classRecord.id;
-      console.log("classid",classRecord.id)
-    }
-
     if (profile_photo !== undefined) updateData.profile_photo = profile_photo;
     if (first_name !== undefined) updateData.first_name = first_name;
     if (last_name !== undefined) updateData.last_name = last_name;
-    if (year_group_id !== undefined) updateData.year_group_id = year_group_id;
+    if (current_year_group_id !== undefined) updateData.current_year_group_id = current_year_group_id;
+    if (class_id !== undefined) updateData.class_id = class_id;
     if (hair_color !== undefined) updateData.hair_color = hair_color;
     if (height !== undefined) updateData.height = height;
 
