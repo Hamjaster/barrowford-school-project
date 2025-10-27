@@ -276,7 +276,7 @@ export const createPersonalSection = async (req: AuthenticatedRequest, res: Resp
       .from('moderations')
       .insert({
         student_id: student.id,
-        year_group_id: student.year_group_id,
+        year_group_id: student.current_year_group_id,
         class_id: student.class_id,
         entity_type: 'personal_sections',
         entity_id: data.id,
@@ -340,7 +340,7 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
       .from('moderations')
       .insert({
         student_id: student.id,
-        year_group_id: student.year_group_id,
+        year_group_id: student.current_year_group_id,
         class_id: student.class_id,
         entity_type: 'personal_sections',
         entity_id: id,

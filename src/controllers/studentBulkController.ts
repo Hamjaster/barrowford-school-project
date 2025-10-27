@@ -1,42 +1,159 @@
 import { Response } from 'express';
-import { supabase } from '../db/supabase.js';
+import { supabase, supabaseAdmin } from '../db/supabase.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import csv from 'csv-parser';
 import { Readable } from 'stream';
 
 interface StudentCSVData {
+  misId: string;
   forename: string;
   legalSurname: string;
-  gender: string;
-  dob: string;
-  adno: string;
-  year: string;
   reg: string;
+  year: string;
+  primaryEmail: string;
 }
 
 interface CreateStudentRequest {
+  misId: string;
   forename: string;
   legalSurname: string;
-  gender: string;
-  dob: string;
-  adno: string;
-  year: string;
   reg: string;
+  year: string;
+  primaryEmail: string;
 }
 
 /**
- * Parse date from "DD Month YYYY" format to ISO date string
+ * Extract first name from email address
  */
-const parseDate = (dateStr: string): string => {
+const extractFirstNameFromEmail = (email: string): string => {
   try {
-    // Handle formats like "08 October 2014", "27 December 2018"
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) {
-      throw new Error(`Invalid date format: ${dateStr}`);
-    }
-    return date.toISOString();
+    // Extract the part before @ and take the first part before any dots
+    const localPart = email.split('@')[0];
+    const firstName = localPart.split('.')[0];
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
   } catch (error) {
-    throw new Error(`Failed to parse date: ${dateStr}`);
+    return 'Parent'; // Fallback name
+  }
+};
+
+/**
+ * Create or find parent by email
+ */
+const createOrFindParent = async (primaryEmail: string) => {
+  try {
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(primaryEmail)) {
+      throw new Error(`Invalid email format: ${primaryEmail}`);
+    }
+
+    // Extract first name from email
+    const firstName = extractFirstNameFromEmail(primaryEmail);
+    
+    // Check if parent already exists by primary email
+    const { data: existingParent, error: existingError } = await supabase
+      .from('parents')
+      .select('id, first_name, last_name, email')
+      .eq('email', primaryEmail)
+      .single();
+
+    console.log(existingParent, 'existingParent !!!', 'email : ', primaryEmail);
+
+    let parentResult;
+    let action = 'created';
+
+    if (existingParent && !existingError) {
+      // Parent exists, return existing parent
+      console.log(`Found existing parent with primary email: ${primaryEmail}`);
+      parentResult = existingParent;
+      action = 'found';
+    } else {
+      // Parent doesn't exist, create new one
+      console.log(`Creating new parent with primary email: ${primaryEmail}`);
+
+      // Create Supabase Auth user (requires admin privileges)
+      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: primaryEmail,
+        password: 'test1234',
+        email_confirm: true,
+        user_metadata: {
+          first_name: firstName,
+          last_name: null,
+          role: 'parent'
+        }
+      });
+
+      if (authError || !authUser.user) {
+        throw new Error(`Failed to create auth user: ${authError?.message || 'Unknown error'}`);
+      }
+
+      // Create parent record
+      const { data: newParent, error: parentError } = await supabase
+        .from('parents')
+        .insert({
+          auth_user_id: authUser.user.id,
+          first_name: firstName,
+          last_name: null,
+          email: primaryEmail,
+          status: 'active'
+        })
+        .select('*')
+        .single();
+
+      if (parentError) {
+        // If parent creation fails, clean up the auth user (requires admin privileges)
+        await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+        throw new Error(`Failed to create parent record: ${parentError.message}`);
+      }
+
+      parentResult = newParent;
+    }
+
+    return {
+      parent: parentResult,
+      action: action
+    };
+  } catch (error: any) {
+    throw new Error(`Parent operation failed: ${error.message}`);
+  }
+};
+
+/**
+ * Create student-parent relationship
+ */
+const createStudentParentRelationship = async (studentId: number, parentId: number) => {
+  try {
+    // Check if relationship already exists
+    const { data: existingRelationship, error: relCheckError } = await supabase
+      .from('parent_student_relationships')
+      .select('id')
+      .eq('parent_id', parentId)
+      .eq('student_id', studentId)
+      .single();
+
+    if (existingRelationship && !relCheckError) {
+      console.log(`Student-parent relationship already exists for parent ${parentId} and student ${studentId}`);
+      return existingRelationship;
+    }
+
+    // Create parent-student relationship
+    const { data: relationship, error: relError } = await supabase
+      .from('parent_student_relationships')
+      .insert({
+        parent_id: parentId,
+        student_id: studentId
+      })
+      .select('*')
+      .single();
+
+    if (relError) {
+      throw new Error(`Failed to create parent-student relationship: ${relError.message}`);
+    }
+
+    console.log(`Created student-parent relationship for parent ${parentId} and student ${studentId}`);
+    return relationship;
+  } catch (error: any) {
+    throw new Error(`Relationship creation failed: ${error.message}`);
   }
 };
 
@@ -96,8 +213,7 @@ const findOrCreateClass = async (className: string, yearGroupId: number) => {
     const { data: newClass, error: createError } = await supabase
       .from('classes')
       .insert({
-        name: className,
-        year_group_id: yearGroupId
+        name: className
       })
       .select('id, name')
       .single();
@@ -118,56 +234,51 @@ const findOrCreateClass = async (className: string, yearGroupId: number) => {
 export const createStudentFromCSV = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const {
+      misId,
       forename,
       legalSurname,
-      gender,
-      dob,
-      adno,
+      reg,
       year,
-      reg
+      primaryEmail
     }: CreateStudentRequest = req.body;
 
     // Validation
-    if (!forename || !legalSurname || !gender || !dob || !adno || !year || !reg) {
+    if (!forename || !legalSurname || !misId || !year || !reg || !primaryEmail) {
       return res.status(400).json({
         success: false,
-        error: 'All fields are required: forename, legalSurname, gender, dob, adno, year, reg'
+        error: 'All fields are required: misId, forename, legalSurname, reg, year, primaryEmail'
       });
     }
 
-    // Validate gender
-    if (!['M', 'F'].includes(gender.toUpperCase())) {
+    // Trim spaces from email address
+    const trimmedEmail = primaryEmail.trim();
+    
+    // Validate trimmed email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
       return res.status(400).json({
         success: false,
-        error: 'Gender must be M or F'
+        error: `Invalid email format: ${trimmedEmail}`
       });
     }
 
-    // Parse date
-    let parsedDob: string;
-    try {
-      parsedDob = parseDate(dob);
-    } catch (error: any) {
-      return res.status(400).json({
-        success: false,
-        error: error.message
-      });
-    }
-
-    // Generate username and email
+    // Generate username and email for student
     const username = `${forename.toLowerCase()}.${legalSurname.toLowerCase()}`;
     const email = `${username}@school.com`;
 
-    // Check if student already exists by admission_no
+    // Check if student already exists by admission_no (misId)
     const { data: existingStudent, error: existingError } = await supabase
       .from('students')
       .select('id, admission_no, first_name, last_name')
-      .eq('admission_no', adno)
+      .eq('admission_no', misId)
       .single();
+
+    let studentResult;
+    let action = 'created';
 
     if (existingStudent && !existingError) {
       // Student exists, update their details
-      console.log(`Updating existing student with admission_no: ${adno}`);
+      console.log(`Updating existing student with admission_no: ${misId}`);
       
       // Find or create year group
       const yearGroup = await findOrCreateYearGroup(year);
@@ -181,15 +292,12 @@ export const createStudentFromCSV = async (req: AuthenticatedRequest, res: Respo
         .update({
           first_name: forename,
           last_name: legalSurname,
-          gender: gender.toUpperCase(),
-          dob: parsedDob,
-          year_group_id: yearGroup.id,
-          current_year_group_id: yearGroup.id, // Same as year_group_id as requested
+          current_year_group_id: yearGroup.id,
           class_id: classData.id,
           username: username,
           email: email
         })
-        .eq('admission_no', adno)
+        .eq('admission_no', misId)
         .select('*')
         .single();
 
@@ -197,82 +305,76 @@ export const createStudentFromCSV = async (req: AuthenticatedRequest, res: Respo
         throw new Error(`Failed to update student: ${updateError.message}`);
       }
 
-      return res.status(200).json({
-        success: true,
-        message: 'Student updated successfully',
-        data: {
-          student: updatedStudent,
-          yearGroup,
-          class: classData,
-          action: 'updated'
+      studentResult = updatedStudent;
+      action = 'updated';
+    } else {
+      // Student doesn't exist, create new one
+      console.log(`Creating new student with admission_no: ${misId}`);
+
+      // Find or create year group
+      const yearGroup = await findOrCreateYearGroup(year);
+      
+      // Find or create class
+      const classData = await findOrCreateClass(reg, yearGroup.id);
+
+      // Create Supabase Auth user (requires admin privileges)
+      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: email,
+        password: 'test1234',
+        email_confirm: true,
+        user_metadata: {
+          first_name: forename,
+          last_name: legalSurname,
+          role: 'student'
         }
       });
-    }
 
-    // Student doesn't exist, create new one
-    console.log(`Creating new student with admission_no: ${adno}`);
-
-    // Find or create year group
-    const yearGroup = await findOrCreateYearGroup(year);
-    
-    // Find or create class
-    const classData = await findOrCreateClass(reg, yearGroup.id);
-
-    // Create Supabase Auth user
-    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-      email: email,
-      password: 'test1234',
-      email_confirm: true,
-      user_metadata: {
-        first_name: forename,
-        last_name: legalSurname,
-        role: 'student'
+      if (authError || !authUser.user) {
+        throw new Error(`Failed to create auth user: ${authError?.message || 'Unknown error'}`);
       }
-    });
 
-    if (authError || !authUser.user) {
-      throw new Error(`Failed to create auth user: ${authError?.message || 'Unknown error'}`);
+      // Create student record
+      const { data: newStudent, error: studentError } = await supabase
+        .from('students')
+        .insert({
+          auth_user_id: authUser.user.id,
+          first_name: forename,
+          last_name: legalSurname,
+          admission_no: misId,
+          current_year_group_id: yearGroup.id,
+          enrolled_year_group_id: yearGroup.id,
+          class_id: classData.id,
+          username: username,
+          email: email,
+          status: 'active'
+        })
+        .select('*')
+        .single();
+
+      if (studentError) {
+        // If student creation fails, clean up the auth user (requires admin privileges)
+        await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+        throw new Error(`Failed to create student record: ${studentError.message}`);
+      }
+
+      studentResult = newStudent;
     }
 
-    // Create student record
-    const { data: newStudent, error: studentError } = await supabase
-      .from('students')
-      .insert({
-        auth_user_id: authUser.user.id,
-        first_name: forename,
-        last_name: legalSurname,
-        gender: gender.toUpperCase(),
-        dob: parsedDob,
-        admission_no: adno,
-        year_group_id: yearGroup.id,
-        current_year_group_id: yearGroup.id, // Same as year_group_id as requested
-        enrolled_year_group_id: yearGroup.id, // Same as year_group_id as requested
-        class_id: classData.id,
-        username: username,
-        email: email,
-        status: 'active'
-      })
-      .select('*')
-      .single();
+    // Create or find parent using trimmed primary email
+    const parentResult = await createOrFindParent(trimmedEmail);
 
-    if (studentError) {
-      // If student creation fails, clean up the auth user
-      await supabase.auth.admin.deleteUser(authUser.user.id);
-      throw new Error(`Failed to create student record: ${studentError.message}`);
-    }
+    // Create student-parent relationship
+    const relationshipResult = await createStudentParentRelationship(studentResult.id, parentResult.parent.id);
 
     return res.status(201).json({
       success: true,
-      message: 'Student created successfully',
+      message: `Student ${action} and parent linked successfully`,
       data: {
-        student: newStudent,
-        yearGroup,
-        class: classData,
-        authUser: {
-          id: authUser.user.id,
-          email: authUser.user.email
-        },
-        action: 'created'
+        student: studentResult,
+        parent: parentResult.parent,
+        relationship: relationshipResult,
+        parentAction: parentResult.action,
+        studentAction: action
       }
     });
 
@@ -303,7 +405,7 @@ export const getStudentByAdmissionNo = async (req: AuthenticatedRequest, res: Re
       .from('students')
       .select(`
         *,
-        year_groups!students_year_group_id_fkey(name),
+        year_groups!students_current_year_group_id_fkey(name),
         classes!students_class_id_fkey(name)
       `)
       .eq('admission_no', admissionNo)
@@ -331,7 +433,23 @@ export const getStudentByAdmissionNo = async (req: AuthenticatedRequest, res: Re
 };
 
 /**
- * Bulk import students from CSV file
+ * Bulk import students from CSV file using the reusable createStudentFromCSV function
+ * 
+ * Expected CSV format (based on the provided CSV structure):
+ * - MIS ID: Can be empty (will auto-generate if missing)
+ * - Forename: Student's first name
+ * - Legal Surname: Student's last name  
+ * - Reg: Registration/Class info (e.g., "EYFS/Yr 1 O")
+ * - Year: Year group (e.g., "Year R")
+ * - Primary Email: Parent's email address (spaces will be automatically trimmed)
+ * 
+ * Example CSV content:
+ * MIS ID,Forename,Legal Surname,Reg,Year,Primary Email
+ * C02954,Harley,Ansbro,EYFS/Yr 1 O,Year R,lucy.belgrave@hotmail.com
+ * C02955,Abdul-Momin,Arshad,EYFS/Yr 1 G,Year R,kaini_92gemini@hotmail.com
+ * 
+ * This function reuses the createStudentFromCSV logic to ensure consistency
+ * and maintainability across single and bulk operations.
  */
 export const bulkImportStudentsFromCSV = async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -364,13 +482,12 @@ export const bulkImportStudentsFromCSV = async (req: AuthenticatedRequest, res: 
           mapHeaders: ({ header }) => {
             // Map CSV headers to our expected format
             const headerMap: { [key: string]: string } = {
+              'MIS ID': 'misId',
               'Forename': 'forename',
               'Legal Surname': 'legalSurname',
-              'Gender': 'gender',
-              'DOB': 'dob',
-              'Adno': 'adno',
+              'Reg': 'reg',
               'Year': 'year',
-              'Reg': 'reg'
+              'Primary Email': 'primaryEmail'
             };
             return headerMap[header] || header.toLowerCase().replace(/\s+/g, '');
           }
@@ -394,147 +511,89 @@ export const bulkImportStudentsFromCSV = async (req: AuthenticatedRequest, res: 
     }
 
     console.log(`Processing ${csvData.length} student records from CSV...`);
+    console.log('Sample CSV data:', csvData.slice(0, 2)); // Log first 2 rows for debugging
 
-    // Process each student record
+    // Process each student record using the reusable createStudentFromCSV function
     for (let i = 0; i < csvData.length; i++) {
       const studentData = csvData[i];
       const rowNumber = i + 2; // +2 because CSV starts from row 2 (row 1 is header)
 
       try {
-        // Validate required fields
-        if (!studentData.forename || !studentData.legalSurname || !studentData.gender || 
-            !studentData.dob || !studentData.adno || !studentData.year || !studentData.reg) {
-          throw new Error('Missing required fields: forename, legalSurname, gender, dob, adno, year, reg');
+        // Validate required fields (MIS ID can be empty based on the CSV format)
+        if (!studentData.forename || !studentData.legalSurname || 
+            !studentData.year || !studentData.reg || !studentData.primaryEmail) {
+          throw new Error('Missing required fields: forename, legalSurname, year, reg, primaryEmail');
         }
 
-        // Validate gender
-        if (!['M', 'F'].includes(studentData.gender.toUpperCase())) {
-          throw new Error('Gender must be M or F');
+        // Trim spaces from email address
+        const originalEmail = studentData.primaryEmail;
+        studentData.primaryEmail = studentData.primaryEmail.trim();
+        
+        // Log if email was trimmed (for debugging)
+        if (originalEmail !== studentData.primaryEmail) {
+          console.log(`Trimmed email for row ${rowNumber}: "${originalEmail}" -> "${studentData.primaryEmail}"`);
+        }
+        
+        // Validate trimmed email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(studentData.primaryEmail)) {
+          throw new Error(`Invalid email format: ${studentData.primaryEmail}`);
         }
 
-        // Parse date
-        let parsedDob: string;
-        try {
-          parsedDob = parseDate(studentData.dob);
-        } catch (error) {
-          throw new Error(`Invalid date format: ${studentData.dob}`);
+        // Generate MIS ID if not provided (some rows in CSV have empty MIS ID)
+        if (!studentData.misId || studentData.misId.trim() === '') {
+          studentData.misId = `AUTO_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         }
 
-        // Generate username and email
-        const username = `${studentData.forename.toLowerCase()}.${studentData.legalSurname.toLowerCase()}`;
-        const email = `${username}@school.com`;
-
-        // Check if student already exists by admission_no
-        const { data: existingStudent, error: existingError } = await supabase
-          .from('students')
-          .select('id, admission_no, first_name, last_name')
-          .eq('admission_no', studentData.adno)
-          .single();
-
-        let action = 'created';
-        let studentResult;
-
-        if (existingStudent && !existingError) {
-          // Student exists, update their details
-          console.log(`Updating existing student with admission_no: ${studentData.adno} (Row ${rowNumber})`);
-          
-          // Find or create year group
-          const yearGroup = await findOrCreateYearGroup(studentData.year);
-          
-          // Find or create class
-          const classData = await findOrCreateClass(studentData.reg, yearGroup.id);
-
-          // Update student record
-          const { data: updatedStudent, error: updateError } = await supabase
-            .from('students')
-            .update({
-              first_name: studentData.forename,
-              last_name: studentData.legalSurname,
-              gender: studentData.gender.toUpperCase(),
-              dob: parsedDob,
-              year_group_id: yearGroup.id,
-              current_year_group_id: yearGroup.id,
-              class_id: classData.id,
-              username: username,
-              email: email
-            })
-            .eq('admission_no', studentData.adno)
-            .select('*')
-            .single();
-
-          if (updateError) {
-            throw new Error(`Failed to update student: ${updateError.message}`);
+        // Create a mock request object for the createStudentFromCSV function
+        const mockReq = {
+          body: {
+            misId: studentData.misId,
+            forename: studentData.forename,
+            legalSurname: studentData.legalSurname,
+            reg: studentData.reg,
+            year: studentData.year,
+            primaryEmail: studentData.primaryEmail
           }
+        } as AuthenticatedRequest;
 
-          studentResult = updatedStudent;
-          action = 'updated';
-        } else {
-          // Student doesn't exist, create new one
-          console.log(`Creating new student with admission_no: ${studentData.adno} (Row ${rowNumber})`);
+        // Create a mock response object to capture the result
+        let result: any = null;
+        let error: any = null;
 
-          // Find or create year group
-          const yearGroup = await findOrCreateYearGroup(studentData.year);
-          
-          // Find or create class
-          const classData = await findOrCreateClass(studentData.reg, yearGroup.id);
-
-          // Create Supabase Auth user
-          const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-            email: email,
-            password: 'test1234',
-            email_confirm: true,
-            user_metadata: {
-              first_name: studentData.forename,
-              last_name: studentData.legalSurname,
-              role: 'student'
+        const mockRes = {
+          status: (code: number) => ({
+            json: (data: any) => {
+              if (code >= 200 && code < 300) {
+                result = data;
+              } else {
+                error = data;
+              }
             }
-          });
+          })
+        } as Response;
 
-          if (authError || !authUser.user) {
-            throw new Error(`Failed to create auth user: ${authError?.message || 'Unknown error'}`);
-          }
+        // Call the reusable createStudentFromCSV function
+        await createStudentFromCSV(mockReq, mockRes);
 
-          // Create student record
-          const { data: newStudent, error: studentError } = await supabase
-            .from('students')
-            .insert({
-              auth_user_id: authUser.user.id,
-              first_name: studentData.forename,
-              last_name: studentData.legalSurname,
-              gender: studentData.gender.toUpperCase(),
-              dob: parsedDob,
-              admission_no: studentData.adno,
-              year_group_id: yearGroup.id,
-              current_year_group_id: yearGroup.id,
-              enrolled_year_group_id: yearGroup.id,
-              class_id: classData.id,
-              username: username,
-              email: email,
-              status: 'active'
-            })
-            .select('*')
-            .single();
-
-          if (studentError) {
-            // If student creation fails, clean up the auth user
-            await supabase.auth.admin.deleteUser(authUser.user.id);
-            throw new Error(`Failed to create student record: ${studentError.message}`);
-          }
-
-          studentResult = newStudent;
+        if (error) {
+          throw new Error(error.error || 'Failed to create student');
         }
 
+        if (result && result.success) {
         // Record successful result
         results.push({
           success: true,
           data: {
-            student: studentResult,
-            action: action,
-            admission_no: studentData.adno,
+              ...result.data,
+            admission_no: studentData.misId,
             name: `${studentData.forename} ${studentData.legalSurname}`
           },
           row: rowNumber
         });
+        } else {
+          throw new Error('Unknown error occurred during student creation');
+        }
 
       } catch (error: any) {
         console.error(`Error processing student at row ${rowNumber}:`, error.message);
@@ -558,15 +617,21 @@ export const bulkImportStudentsFromCSV = async (req: AuthenticatedRequest, res: 
     const successfulImports = results.filter(r => r.success).length;
     const failedImports = results.filter(r => !r.success).length;
     const totalProcessed = results.length;
+    const parentsCreated = results.filter(r => r.success && r.data?.parentAction === 'created').length;
+    const parentsFound = results.filter(r => r.success && r.data?.parentAction === 'found').length;
+    const relationshipsCreated = results.filter(r => r.success && r.data?.relationship).length;
 
     // Prepare response
     const response = {
       success: true,
-      message: `${successfulImports} students imported, ${failedImports} failed to import`,
+      message: `${successfulImports} students imported, ${failedImports} failed to import. ${parentsCreated} parents created, ${parentsFound} existing parents linked.`,
       summary: {
         totalProcessed,
         successfulImports,
         failedImports,
+        parentsCreated,
+        parentsFound,
+        relationshipsCreated,
         successRate: totalProcessed > 0 ? Math.round((successfulImports / totalProcessed) * 100) : 0
       },
       details: {
@@ -576,7 +641,7 @@ export const bulkImportStudentsFromCSV = async (req: AuthenticatedRequest, res: 
     };
 
     // Log summary
-    console.log(`Bulk import completed: ${successfulImports} successful, ${failedImports} failed out of ${totalProcessed} total`);
+    console.log(`Bulk import completed: ${successfulImports} successful, ${failedImports} failed out of ${totalProcessed} total. ${parentsCreated} parents created, ${parentsFound} existing parents linked.`);
 
     return res.status(200).json(response);
 

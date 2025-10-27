@@ -18,16 +18,19 @@ export interface AuthenticatedRequest extends Request {
 // Centralized permissions system
 const permissions = {
   admin: [
+    "manage_students",
     "manage_users",
     "get_users",
     "manage_student_images"
   ],
   staff_admin: [
+    "manage_students",
     "manage_users",
     "get_users",
     "manage_student_images"
   ],
   staff: [
+    "manage_students",
     "manage_users",
     "get_users",
     "manage_student_images",

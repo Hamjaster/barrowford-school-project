@@ -7,7 +7,7 @@ import { logAudit } from '../utils/lib.js';
 const getStudentRecord = async (userId: string) => {
   return await supabase
     .from('students')
-    .select('id, year_group_id')
+    .select('id, current_year_group_id')
     .eq('id', userId)
     .single();
 };
@@ -33,7 +33,7 @@ export const uploadStudentImage = async (req: AuthenticatedRequest, res: Respons
    
 
     // Use provided year_group_id or fall back to student's year_group_id
-    const targetYearGroupId = year_group_id || student.year_group_id;
+    const targetYearGroupId = year_group_id || student.current_year_group_id;
 
     // Fetch year group name for entity_title
     const { data: yearGroup, error: yearGroupError } = await supabase
@@ -180,7 +180,7 @@ export const deleteMyStudentImage = async (req: AuthenticatedRequest, res: Respo
       .from('moderations')
       .insert({
         student_id: studentRow.id,
-        year_group_id: studentRow.year_group_id,
+        year_group_id: studentRow.current_year_group_id,
         class_id: studentRow.class_id,
         entity_type: 'student_images',
         entity_id: id,

@@ -1,6 +1,6 @@
 import { AuthenticatedRequest, checkPermission } from "../middleware/auth.js";
 import { Response } from "express";
-import { supabase } from "../db/supabase.js";
+import { supabase, supabaseAdmin } from "../db/supabase.js";
 import { canManageRole, getManageableRoles, getRoleTable, canManageUsers, UserRole } from "../utils/roleUtils.js";
 import { logAudit, getChildrenOfParent, cleanupStudentOnDeactivation, handleParentDeactivation, handleParentActivation, formatRole } from "../utils/lib.js";
 
@@ -348,9 +348,9 @@ export const deleteUser = async (req: AuthenticatedRequest, res: Response) => {
       actorRole: req.user.role
     });
 
-    // Also delete from auth.users table if auth_user_id exists
+    // Also delete from auth.users table if auth_user_id exists (requires admin privileges)
     if (userData.auth_user_id) {
-      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(
+      const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(
         userData.auth_user_id
       );
       

@@ -213,7 +213,7 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
     // Fetch student id using auth_user_id (UUID from Supabase Auth)
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, year_group_id, class_id')
+      .select('id, current_year_group_id, class_id')
       .eq('auth_user_id', req.user.authUserId)
       .maybeSingle()
 
@@ -258,7 +258,7 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
       .from('reflections')
       .insert({
         student_id: student.id,
-        year_group_id: student.year_group_id,
+        year_group_id: student.current_year_group_id,
         topic_id: topicID,
         content,
         attachment_url: imageURL,
@@ -279,13 +279,13 @@ export const createReflection = async (req: AuthenticatedRequest, res: Response)
       entity_type: 'reflection',
       action_type: 'create',
       student_id: student.id,
-      year_group_id: student.year_group_id,
+      year_group_id: student.current_year_group_id,
       class_id: student.class_id,
       entity_id: reflection.id,
       entity_title: topic.title,
       new_content: {
         student_id: student.id,
-        year_group_id: student.year_group_id,
+        year_group_id: student.current_year_group_id,
         topic_id: topicID,
         content,
         attachment_url: imageURL,
@@ -600,7 +600,7 @@ export const requestDeleteReflection = async (req: AuthenticatedRequest, res: Re
     // Fetch student id using auth_user_id
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, year_group_id, class_id')
+      .select('id, current_year_group_id, class_id')
       .eq('auth_user_id', req.user.authUserId)
       .single();
 
@@ -653,7 +653,7 @@ export const requestDeleteReflection = async (req: AuthenticatedRequest, res: Re
       action_type: 'delete',
       entity_id: reflectionId,
       student_id: student.id,
-      year_group_id: student.year_group_id,
+      year_group_id: student.current_year_group_id,
       class_id: student.class_id,
       entity_title: topic.title,
       old_content: reflection,

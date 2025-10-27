@@ -50,7 +50,7 @@ export const addStudentLearning = async (req: AuthenticatedRequest, res: Respons
         .from('moderations')
         .insert({
           student_id: student.id,
-          year_group_id: student.year_group_id,
+          year_group_id: student.current_year_group_id,
           class_id: student.class_id,
           entity_type: 'student_learning_entities',
           entity_id: learning.id,
@@ -113,7 +113,7 @@ export const deleteStudentLearning = async (req: AuthenticatedRequest, res: Resp
         .from('moderations')
         .insert({
           student_id: student.id,
-          year_group_id: student.year_group_id,
+          year_group_id: student.current_year_group_id,
           class_id: student.class_id,
           entity_type: 'student_learning_entities',
           entity_id: id,

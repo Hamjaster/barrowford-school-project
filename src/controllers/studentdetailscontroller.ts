@@ -15,7 +15,7 @@ export const getStudentDetails = async (req: AuthenticatedRequest, res: Response
     // 1️⃣ Fetch student record
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, first_name, last_name, dob, year_group_id, class_id, hair_color, height,profile_photo')
+      .select('id, first_name, last_name, dob, current_year_group_id, class_id, hair_color, height,profile_photo')
       .eq('auth_user_id', req.user.authUserId)
       .single();
 
@@ -49,7 +49,7 @@ export const getStudentDetails = async (req: AuthenticatedRequest, res: Response
       data: {
         name: fullName,
         age,
-        year_group_id: student.year_group_id,
+        year_group_id: student.current_year_group_id,
         class_id: student.class_id,
         class_name: className,
         hair_color : student.hair_color,

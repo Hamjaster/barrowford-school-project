@@ -261,7 +261,7 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
     // Get student's current year group and enrollment date using auth user ID
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('year_group_id, created_at')
+      .select('current_year_group_id, created_at')
       .eq('auth_user_id', req.user.authUserId)
       .single();
 
@@ -269,7 +269,7 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
       return res.status(404).json({ error: 'Student not found' });
     }
 
-    if (!student.year_group_id) {
+    if (!student.current_year_group_id) {
       return res.status(400).json({ error: 'Student does not have a current year group assigned' });
     }
 
@@ -302,7 +302,7 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
       .filter((yearGroup: any) => {
         // EYFS is id=1, Year 1 is id=2, Year 2 is id=3, etc.
         // Students can access all years from EYFS up to their current year
-        return yearGroup.id >= 1 && yearGroup.id <= student.year_group_id;
+        return yearGroup.id >= 1 && yearGroup.id <= student.current_year_group_id;
       })
       .map((yearGroup: any) => {
         // Extract subjects from the joined data and filter only active subjects
@@ -322,7 +322,7 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
     res.status(200).json({ 
       success: true, 
       data: eligibleYearGroupsWithSubjects,
-      studentCurrentYear: student.year_group_id,
+      studentCurrentYear: student.current_year_group_id,
       studentEnrollmentDate: student.created_at
     });
   } catch (err: any) {

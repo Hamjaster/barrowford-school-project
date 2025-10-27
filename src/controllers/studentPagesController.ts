@@ -7,7 +7,7 @@ import { logAudit } from '../utils/lib.js';
 const getStudentRecord = async (userId: string) => {
   return await supabase
     .from('students')
-    .select('id, year_group_id')
+    .select('id, current_year_group_id')
     .eq('id', userId)
     .single();
 };
@@ -35,7 +35,7 @@ export const updateImpact = async (req: AuthenticatedRequest, res: Response) => 
       .from('student_pages')
       .select('*')
       .eq('student_id', student.id)
-      .eq('year_group_id', student.year_group_id)
+      .eq('year_group_id', student.current_year_group_id)
       .eq('page_type_id', pageType.id)
       .single();
 
@@ -48,7 +48,7 @@ export const updateImpact = async (req: AuthenticatedRequest, res: Response) => 
         .from('student_pages')
         .insert({
           student_id: student.id,
-          year_group_id: student.year_group_id,
+          year_group_id: student.current_year_group_id,
           page_type_id: pageType.id,
           content
         })
@@ -120,7 +120,7 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
       .from('student_pages')
       .select('*')
       .eq('student_id', student.id)
-      .eq('year_group_id', student.year_group_id)
+      .eq('year_group_id', student.current_year_group_id)
       .eq('page_type_id', pageType.id)
       .single();
 
@@ -133,7 +133,7 @@ export const updateExperience = async (req: AuthenticatedRequest, res: Response)
         .from('student_pages')
         .insert({
           student_id: student.id,
-          year_group_id: student.year_group_id,
+          year_group_id: student.current_year_group_id,
           page_type_id: pageType.id,
           content
         })
@@ -201,7 +201,7 @@ export const getMyImpacts = async (req: AuthenticatedRequest, res: Response) => 
       .from('student_pages')
       .select('id, content, created_at')
       .eq('student_id', student.id)
-      .eq('year_group_id', student.year_group_id)
+      .eq('year_group_id', student.current_year_group_id)
       .eq('page_type_id', pageType.id)
       .single();
 
@@ -212,7 +212,7 @@ export const getMyImpacts = async (req: AuthenticatedRequest, res: Response) => 
       .from('student_pages')
       .insert({
         student_id: student.id,
-        year_group_id: student.year_group_id,
+        year_group_id: student.current_year_group_id,
         page_type_id: pageType.id,
         // wrap in back ticks
         content: `{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null},"content":[{"type":"text","text":"Start typing here..."}]}]}`
@@ -266,7 +266,7 @@ export const getMyExperiences = async (req: AuthenticatedRequest, res: Response)
       .from('student_pages')
       .select('id, content, created_at')
       .eq('student_id', student.id)
-      .eq('year_group_id', student.year_group_id)
+      .eq('year_group_id', student.current_year_group_id)
       .eq('page_type_id', pageType.id)
       .single();
 
@@ -276,7 +276,7 @@ export const getMyExperiences = async (req: AuthenticatedRequest, res: Response)
         .from('student_pages')
         .insert({
           student_id: student.id,
-          year_group_id: student.year_group_id,
+          year_group_id: student.current_year_group_id,
           page_type_id: pageType.id,
           content: `{"type":"doc","content":[{"type":"paragraph","attrs":{"textAlign":null},"content":[{"type":"text","text":"Start typing here..."}]}]}`
         })

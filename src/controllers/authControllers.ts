@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { supabase } from '../db/supabase.js';
+import { supabase, supabaseAdmin } from '../db/supabase.js';
 import { AuthUtils } from '../utils/auth.js';
 import { AuthenticatedRequest } from '../middleware/auth.js';
 import { createClient } from '@supabase/supabase-js';
@@ -96,7 +96,7 @@ const createRoleSpecificEntry = async (role: string, additionalData: any = {}) =
           .from(table)
           .insert({
             auth_user_id: additionalData.auth_user_id,
-            year_group_id: additionalData.year_group_id,
+            current_year_group_id: additionalData.year_group_id,
             class_id: additionalData.class_id || null,
             username: additionalData.username,
             email: additionalData.email,
@@ -300,8 +300,8 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
     console.log("EMAIL TO USE", emailToUse);
-    // Create user in Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Create user in Supabase Auth (requires admin privileges)
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: emailToUse,
       password: password,
       email_confirm: true, // Create user with auto-confirmation
@@ -358,8 +358,8 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
 
       } catch (roleError) {
         console.error(`Failed to create ${role} entry:`, roleError);
-        // If role-specific creation fails, clean up auth user
-        await supabase.auth.admin.deleteUser(authData.user.id);
+        // If role-specific creation fails, clean up auth user (requires admin privileges)
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
         return res.status(400).json({
           success: false,
           error: `Failed to create ${role} profile: ${roleError}`
@@ -587,8 +587,8 @@ export const manualPasswordReset = async (req: AuthenticatedRequest, res: Respon
     }
 
     console.log('updating password in auth');
-    // Update password in Supabase Auth
-    const { error: authError } = await supabase.auth.admin.updateUserById(
+    // Update password in Supabase Auth (requires admin privileges)
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
       targetUser.auth_user_id,
       { password: newPassword }
     );

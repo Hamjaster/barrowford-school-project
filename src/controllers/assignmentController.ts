@@ -19,7 +19,7 @@ export const getStudentAssignments = async (req: AuthenticatedRequest, res: Resp
     // Get student details
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, first_name, last_name, username, year_group_id, class_id, status')
+      .select('id, first_name, last_name, username, current_year_group_id, class_id, status')
       .eq('id', studentId)
       .single();
 
@@ -52,7 +52,7 @@ export const getStudentAssignments = async (req: AuthenticatedRequest, res: Resp
     const { data: teacher, error: teacherError } = await supabase
       .from('staffs')
       .select('id, first_name, last_name, email, year_group_id, class_id, status')
-      .eq('year_group_id', student.year_group_id)
+      .eq('year_group_id', student.current_year_group_id)
       .eq('class_id', student.class_id)
       .single();
 
@@ -76,7 +76,7 @@ export const getStudentAssignments = async (req: AuthenticatedRequest, res: Resp
       .from('staffs')
       .select('id, first_name, last_name, email, year_group_id, class_id, status')
       .eq('status', 'active')
-      .eq('year_group_id', student.year_group_id);
+      .eq('year_group_id', student.current_year_group_id);
 
     if (availableTeachersError) throw availableTeachersError;
 
@@ -223,7 +223,7 @@ export const assignTeacherToStudent = async (req: AuthenticatedRequest, res: Res
     // Get student details
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, first_name, last_name, year_group_id, class_id')
+      .select('id, first_name, last_name, current_year_group_id, class_id')
       .eq('id', studentId)
       .single();
 
@@ -250,7 +250,7 @@ export const assignTeacherToStudent = async (req: AuthenticatedRequest, res: Res
     }
 
     // Check if teacher's year_group_id matches student's year_group_id
-    if (teacher.year_group_id !== student.year_group_id) {
+    if (teacher.year_group_id !== student.current_year_group_id) {
       return res.status(400).json({
         success: false,
         error: 'Teacher and student must be in the same year group'

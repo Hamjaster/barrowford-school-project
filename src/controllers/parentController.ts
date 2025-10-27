@@ -20,7 +20,7 @@ export const getMyChildren = async (req: AuthenticatedRequest, res: Response) =>
     const { data: children, error: childrenError } = await supabase
       .from('parent_student_relationships')
       .select(`
-        student:students (id, first_name, last_name, username, year_group_id, class_id, created_at, status, profile_photo )
+        student:students (id, first_name, last_name, username, current_year_group_id, class_id, created_at, status, profile_photo )
       `)
       .eq('parent_id', parent.id);
 
@@ -66,7 +66,7 @@ export const getChildDetails = async (req: AuthenticatedRequest, res: Response) 
     // Fetch student details
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, first_name, last_name, username, year_group_id, class_id, created_at, status')
+      .select('id, first_name, last_name, username, current_year_group_id, class_id, created_at, status, profile_photo')
       .eq('id', studentId)
       .single();
 

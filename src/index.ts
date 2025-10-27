@@ -17,6 +17,8 @@ import parentRoutes from './routes/parent.js';
 import reflectionRouter from './routes/reflection.js'
 import moderationRoutes from './routes/moderation.js';
 import studentBulkRoutes from './routes/studentBulk.js';
+import studentBulkSSERoutes from './routes/studentBulkSSE.js';
+import parentBulkRoutes from './routes/parentBulk.js';
 import assignmentRoutes from './routes/assignment.js';
 
 
@@ -56,6 +58,8 @@ app.use('/api/parent', parentRoutes);
 app.use('/api/reflection',reflectionRouter)
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/student-bulk', studentBulkRoutes);
+app.use('/api/student-bulk-sse', studentBulkSSERoutes);
+app.use('/api/parent-bulk', parentBulkRoutes);
 app.use('/api/assignment', assignmentRoutes);
 
 // Root endpoint

@@ -32,13 +32,13 @@ export const getAssignedStudents = async (req: AuthenticatedRequest, res: Respon
         email,
         dob,
         height,
-        year_group_id,
+        current_year_group_id,
         class_id,
         created_at,
         profile_photo,
         hair_color
       `)
-      .eq("year_group_id", teacher.year_group_id)
+      .eq("current_year_group_id", teacher.year_group_id)
       .eq("class_id", teacher.class_id);
 
     if (studentError) throw studentError;
@@ -57,8 +57,8 @@ export const getAssignedStudents = async (req: AuthenticatedRequest, res: Respon
         age,
         height:student.height,
         hair_color:student.hair_color,
-        year: student.year_group_id,
-        class: student.class_id, // we'll resolve class name below
+        current_year_group_id: student.current_year_group_id,
+        class_id: student.class_id, // we'll resolve class name below
         profile_photo: student.profile_photo,
         created_at: student.created_at,
       };
