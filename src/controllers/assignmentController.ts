@@ -13,7 +13,7 @@ export const getStudentAssignments = async (req: AuthenticatedRequest, res: Resp
       return res.status(403).json({
         success: false,
         error: "Insufficient permissions to view student assignments",
-      });
+        });
     }
 
     // Get student details
