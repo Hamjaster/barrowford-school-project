@@ -156,7 +156,7 @@ export const getChildrenOfParent = async (parentId: number) : Promise<any[]> => 
  const { data: children, error: childrenError } = await supabase
  .from('parent_student_relationships')
  .select(`
-   student:students (id, first_name, last_name, username, year_group_id, class_id, created_at, status)
+   student:students (id, first_name, last_name, username, current_year_group_id, class_id, created_at, status)
  `)
  .eq('parent_id', parentId);
 

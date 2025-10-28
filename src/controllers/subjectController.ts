@@ -265,6 +265,9 @@ export const getEligibleYearGroupsForStudent = async (req: AuthenticatedRequest,
       .eq('auth_user_id', req.user.authUserId)
       .single();
 
+      console.log(student, 'student');
+      console.log(studentError, 'studentError');
+
     if (studentError || !student) {
       return res.status(404).json({ error: 'Student not found' });
     }

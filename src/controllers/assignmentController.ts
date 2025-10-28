@@ -262,7 +262,7 @@ export const assignTeacherToStudent = async (req: AuthenticatedRequest, res: Res
       .from('students')
       .update({ class_id: teacher.class_id })
       .eq('id', studentId)
-      .select('id, first_name, last_name, year_group_id, class_id')
+      .select('id, first_name, last_name, current_year_group_id, class_id')
       .single();
 
     if (updateError) throw updateError;
@@ -311,7 +311,7 @@ export const removeTeacherFromStudent = async (req: AuthenticatedRequest, res: R
     // Get student details
     const { data: student, error: studentError } = await supabase
       .from('students')
-      .select('id, first_name, last_name, year_group_id, class_id')
+      .select('id, first_name, last_name, current_year_group_id, class_id')
       .eq('id', studentId)
       .single();
 
@@ -327,7 +327,7 @@ export const removeTeacherFromStudent = async (req: AuthenticatedRequest, res: R
       .from('students')
       .update({ class_id: null })
       .eq('id', studentId)
-      .select('id, first_name, last_name, year_group_id, class_id')
+      .select('id, first_name, last_name, current_year_group_id, class_id')
       .single();
 
     if (updateError) throw updateError;
