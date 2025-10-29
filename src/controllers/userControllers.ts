@@ -18,6 +18,8 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
       sortOrder = "desc",
     } = req.query;
 
+    console.log(`[getAllUsers] Request - Role filter: ${role}, Creator: ${creatorRole}, AuthUserId: ${creatorUserId}`);
+
     if (!canManageUsers(creatorRole as UserRole)) {
       return res.status(403).json({
         success: false,
@@ -26,6 +28,7 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
     }
 
     const allowedRoles = getManageableRoles(creatorRole as UserRole);
+    console.log(`[getAllUsers] Allowed roles for ${creatorRole}:`, allowedRoles);
 
     const pageNum = parseInt(page as string);
     const limitNum = parseInt(limit as string);
@@ -79,7 +82,14 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
       query = query.order(sortColumn, { ascending: order });
 
       const { data, count, error } = await query;
-      if (error) throw error;
+      
+      if (error) {
+        console.error(`Error querying ${table} for role ${allowedRole}:`, error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+
+      console.log(`[getAllUsers] Role: ${allowedRole}, Table: ${table}, Found: ${data?.length || 0} users, Count: ${count}`);
 
       if (data) {
         users.push(
@@ -125,11 +135,18 @@ export const getAllUsers = async (req: AuthenticatedRequest, res: Response) => {
         },
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in getAllUsers:", error);
+    console.error("Error stack:", error?.stack);
+    console.error("Error message:", error?.message);
+    console.error("Error code:", error?.code);
+    console.error("Error details:", error?.details);
+    console.error("Error hint:", error?.hint);
+    
     res.status(500).json({
       success: false,
-      error: "Internal server error",
+      error: error?.message || "Internal server error",
+      details: process.env.NODE_ENV === 'development' ? error : undefined,
     });
   }
 };
