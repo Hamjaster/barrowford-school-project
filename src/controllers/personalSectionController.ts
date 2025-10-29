@@ -235,6 +235,9 @@ export const createPersonalSection = async (req: AuthenticatedRequest, res: Resp
 
     // Find student record
     const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
+    console.log(student, 'STUDENT')
+    console.log(studentError, 'STUDENT ERROR')
+
     if (studentError || !student) {
       return res.status(404).json({ error: 'Student record not found' });
     }
@@ -305,9 +308,14 @@ export const updatePersonalSection = async (req: AuthenticatedRequest, res: Resp
 
     // Find student record
     const { data: student, error: studentError } = await getStudentRecord(req.user.userId);
+    console.log(student, 'STUDENT')
+    console.log(studentError, 'STUDENT ERROR')
+
     if (studentError || !student) {
       return res.status(404).json({ error: 'Student record not found' });
     }
+    console.log(student, 'STUDENT')
+    console.log(studentError, 'STUDENT ERROR')
 
     // Get old value for audit log
     const { data: oldData, error: oldError } = await supabase
@@ -501,8 +509,11 @@ export const getMyPersonalSectionByTopic = async (req: AuthenticatedRequest, res
     }
 
     // Find student record
-    const {data : student} = await getStudentRecord(req.user.userId);
-    if (!student) {
+    const {data : student, error: studentError} = await getStudentRecord(req.user.userId);
+    console.log(student, 'STUDENT')
+    console.log(studentError, 'STUDENT ERROR')
+
+    if (studentError || !student) {
       return res.status(404).json({ error: 'Student record not found' });
     }
 
