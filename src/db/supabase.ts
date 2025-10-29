@@ -15,4 +15,5 @@ export const supabaseClient = createClient(
 
 // Default export uses client (anon key) for most operations
 // Import supabaseAdmin only for auth.admin operations and bulk imports
-export const supabase = supabaseClient;
+export const supabase = supabaseAdmin;
+// export const supabase = supabaseClient; Remove this line when you want to use the client for most operations
