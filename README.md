@@ -2,7 +2,7 @@
    
 A comprehensive backend system for a UK primary school portal built with Node.js, TypeScript, Express, and Supabase (PostgreSQL).
  
-## Features 
+## Features  
   
 - **Multi-role Authentication System**: Admin, Staff/Teacher, Parent, and Student roles
 - **JWT-based Authentication**: Secure token-based authentication with refresh tokens 
