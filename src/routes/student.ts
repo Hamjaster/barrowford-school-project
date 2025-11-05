@@ -1,12 +1,15 @@
 import { Router } from 'express';
 import { authenticateToken, checkPermission } from '../middleware/auth.js';
 import {
-  updateImpact,
-  updateExperience,
+  addStudentImpact,
+  deleteStudentImpact,
   getMyImpacts,
+} from '../controllers/studentImpactController.js';
+import {
+  addStudentExperience,
+  deleteStudentExperience,
   getMyExperiences,
-  
-} from '../controllers/studentPagesController.js';
+} from '../controllers/studentExperienceController.js';
 import {
   uploadStudentImage,
   getMystudent_images,
@@ -19,12 +22,18 @@ import { getStudentDetails } from '../controllers/studentdetailscontroller.js';
 const router = Router();
 
 // impacts
-router.put('/impacts', authenticateToken,checkPermission("manage_student_pages"), updateImpact as any);
-router.get('/impacts/me', authenticateToken,checkPermission("manage_student_pages"), getMyImpacts as any);
+// router.put('/impacts', authenticateToken,checkPermission("manage_student_pages"), updateImpact as any);
+// router.get('/impacts/me', authenticateToken,checkPermission("manage_student_pages"), getMyImpacts as any);
+router.post('/impacts/', authenticateToken, checkPermission("manage_student_pages"), addStudentImpact as any);
+router.delete('/impacts/:id', authenticateToken, checkPermission("manage_student_pages"), deleteStudentImpact as any);
+router.post('/impacts/me', authenticateToken, checkPermission("manage_student_pages"), getMyImpacts as any);
 
 // experiences
-router.put('/experiences', authenticateToken,checkPermission("manage_student_pages"), updateExperience as any);
-router.get('/experiences/me', authenticateToken,checkPermission("manage_student_pages"), getMyExperiences as any);
+router.post('/experiences/', authenticateToken, checkPermission("manage_student_pages"), addStudentExperience as any);
+router.delete('/experiences/:id', authenticateToken, checkPermission("manage_student_pages"), deleteStudentExperience as any);
+router.post('/experiences/me', authenticateToken, checkPermission("manage_student_pages"), getMyExperiences as any);
+// router.put('/experiences', authenticateToken,checkPermission("manage_student_pages"), updateExperience as any);
+// router.get('/experiences/me', authenticateToken,checkPermission("manage_student_pages"), getMyExperiences as any);
 
 
 // learnings

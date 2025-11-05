@@ -34,7 +34,8 @@ export const listPendingModerations = async (req: AuthenticatedRequest, res: Res
         id,
         first_name,
         last_name,
-        status
+        status,
+        profile_photo
       )
       `)
       .eq('status', 'pending')
@@ -78,7 +79,8 @@ export const getModerationById = async (req: AuthenticatedRequest, res: Response
         id,
         first_name,
         last_name,
-        status
+        status,
+        profile_photo
       )
       `)
       .eq('id', id)
@@ -129,7 +131,8 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
         id,
         first_name,
         last_name,
-        status
+        status,
+        profile_photo
       )
       `)
       .eq('id', modId)
@@ -358,6 +361,96 @@ export const approveModeration = async (req: AuthenticatedRequest, res: Response
           actorRole: 'student'
         });
       }
+    } else if (mod.entity_type === 'student_impacts') {
+      if (mod.action_type === 'create') {
+        // Update existing impact record status to 'approved'
+        const { data: updated, error: updateErr } = await supabase
+          .from('student_impacts')
+          .update({ 
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id)
+          .select()
+          .single();
+
+        if (updateErr) throw updateErr;
+        applyResult = updated;
+
+        // Log audit for create action
+        await logAudit({
+          action: 'create',
+          entityType: 'student_impacts',
+          entityId: mod.entity_id,
+          oldValue: { ...mod.new_content, status: 'pending' },
+          newValue: updated,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      } else if (mod.action_type === 'delete') {
+        // Actually delete the record when deletion is approved
+        const { error: delErr } = await supabase
+          .from('student_impacts')
+          .delete()
+          .eq('id', mod.entity_id);
+        if (delErr) throw delErr;
+        applyResult = { deleted: true };
+
+        // Log audit for delete action
+        await logAudit({
+          action: 'delete',
+          entityType: 'student_impacts',
+          entityId: mod.entity_id,
+          oldValue: mod.old_content,
+          newValue: null,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      }
+    } else if (mod.entity_type === 'student_experiences') {
+      if (mod.action_type === 'create') {
+        // Update existing experience record status to 'approved'
+        const { data: updated, error: updateErr } = await supabase
+          .from('student_experiences')
+          .update({ 
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id)
+          .select()
+          .single();
+
+        if (updateErr) throw updateErr;
+        applyResult = updated;
+
+        // Log audit for create action
+        await logAudit({
+          action: 'create',
+          entityType: 'student_experiences',
+          entityId: mod.entity_id,
+          oldValue: { ...mod.new_content, status: 'pending' },
+          newValue: updated,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      } else if (mod.action_type === 'delete') {
+        // Actually delete the record when deletion is approved
+        const { error: delErr } = await supabase
+          .from('student_experiences')
+          .delete()
+          .eq('id', mod.entity_id);
+        if (delErr) throw delErr;
+        applyResult = { deleted: true };
+
+        // Log audit for delete action
+        await logAudit({
+          action: 'delete',
+          entityType: 'student_experiences',
+          entityId: mod.entity_id,
+          oldValue: mod.old_content,
+          newValue: null,
+          actorId: mod.student_id,
+          actorRole: 'student'
+        });
+      }
     } else if (mod.entity_type === 'personal_sections') {
       if (mod.action_type === 'create') {
         // Update existing personal section status to 'approved'
@@ -462,7 +555,8 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
         id,
         first_name,
         last_name,
-        status
+        status,
+        profile_photo
       )
       `)
       .eq('id', modId)
@@ -543,6 +637,56 @@ export const rejectModeration = async (req: AuthenticatedRequest, res: Response)
           .eq('id', mod.entity_id);
 
         if (learningUpdateErr) throw learningUpdateErr;
+      }
+    }
+
+    // Handle student_impacts rejection by updating status
+    if (mod.entity_type === 'student_impacts') {
+      if (mod.action_type === 'create') {
+        // Rejecting creation - update status to 'rejected'
+        const { error: impactUpdateErr } = await supabase
+          .from('student_impacts')
+          .update({ 
+            status: 'rejected',
+          })
+          .eq('id', mod.entity_id);
+
+        if (impactUpdateErr) throw impactUpdateErr;
+      } else if (mod.action_type === 'delete') {
+        // Rejecting deletion - revert status back to 'approved'
+        const { error: impactUpdateErr } = await supabase
+          .from('student_impacts')
+          .update({ 
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id);
+
+        if (impactUpdateErr) throw impactUpdateErr;
+      }
+    }
+
+    // Handle student_experiences rejection by updating status
+    if (mod.entity_type === 'student_experiences') {
+      if (mod.action_type === 'create') {
+        // Rejecting creation - update status to 'rejected'
+        const { error: experienceUpdateErr } = await supabase
+          .from('student_experiences')
+          .update({ 
+            status: 'rejected',
+          })
+          .eq('id', mod.entity_id);
+
+        if (experienceUpdateErr) throw experienceUpdateErr;
+      } else if (mod.action_type === 'delete') {
+        // Rejecting deletion - revert status back to 'approved'
+        const { error: experienceUpdateErr } = await supabase
+          .from('student_experiences')
+          .update({ 
+            status: 'approved'
+          })
+          .eq('id', mod.entity_id);
+
+        if (experienceUpdateErr) throw experienceUpdateErr;
       }
     }
 

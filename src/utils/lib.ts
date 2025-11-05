@@ -196,8 +196,8 @@ export const cleanupStudentOnDeactivation = async (studentId: number) => {
       console.log('moderations deleted !')
 
     // 2. Handle student entities based on their status
-    // Get all student entities (images, learnings, reflections, personal_sections)
-    const entityTypes = ['student_images', 'student_learning_entities', 'reflections', 'personal_sections'];
+    // Get all student entities (images, learnings, reflections, personal_sections, impacts, experiences)
+    const entityTypes = ['student_images', 'student_learning_entities', 'reflections', 'personal_sections', 'student_impacts', 'student_experiences'];
     
     for (const entityType of entityTypes) {
       // only get those who's status are in : pending, pending_deletion, pending_updation
