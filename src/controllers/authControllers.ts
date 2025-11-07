@@ -293,6 +293,7 @@ export const createUser = async (req: AuthenticatedRequest, res: Response) => {
     ]);
 
     const existingUser = emailChecks.find(check => check.data && !check.error);
+    console.log(existingUser, 'existingUser !!!');
     if (existingUser) {
       return res.status(400).json({
         success: false,

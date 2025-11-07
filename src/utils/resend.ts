@@ -3,7 +3,7 @@ const resend = new Resend(process.env.RESEND_API);
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
   const { data, error } = await resend.emails.send({
-    from: 'Barrowford <noreply@barrowford.nybble.cloud>',
+    from: 'Barrowford <noreply@barrowford.lancs.sch.uk>',
     to: [to],
     subject: subject,
     html: html,
