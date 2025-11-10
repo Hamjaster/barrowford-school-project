@@ -80,7 +80,7 @@ export class AuthUtils {
         .select('*')
         .eq('email', email)
         .single();
-      console.log("Error", error);
+     
       if (!error && data) {
         console.log("Data found", data);
         return { ...data, role, table };

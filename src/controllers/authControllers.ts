@@ -444,7 +444,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
   const user = await AuthUtils.findUserByEmail(email);
   if (!user) {
-    return res.status(200).json({ success: true, message: 'A reset link has been sent to that email address' });
+    console.log('User not found', email);
+    return res.status(400).json({ success: false, message: 'Failed to send reset email' });
   }
 
   if (user.role === 'student') {
@@ -454,11 +455,52 @@ export const forgotPassword = async (req: Request, res: Response) => {
     });
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.FRONTEND_URL}/reset-password`
+  // Validate FRONTEND_URL is set
+  if (!process.env.FRONTEND_URL) {
+    console.error('FRONTEND_URL environment variable is not set');
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Server configuration error. Please contact support.' 
+    });
+  }
+
+  // Check if user has auth_user_id (exists in Supabase Auth)
+  if (!user.auth_user_id) {
+    console.error('User found in database but missing auth_user_id:', email);
+    return res.status(400).json({ 
+      success: false, 
+      message: 'User account not properly configured in authentication system. Please contact support.' 
+    });
+  }
+
+  const redirectUrl = `${process.env.FRONTEND_URL}reset-password`;
+  console.log('Attempting password reset for:', email, 'Redirect URL:', redirectUrl);
+
+  const { error } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
+    redirectTo: redirectUrl
   });
 
-  if (error) return res.status(400).json({ success: false, message: 'Failed to send reset email' });
+  if (error) {
+    console.error('Password reset error details:', {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      name: error.name
+    });
+    
+    // Provide more specific error messages based on error code
+    if (error.code === 'unexpected_failure') {
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Email service configuration error. Please contact support or check Supabase email settings.' 
+      });
+    }
+    
+    return res.status(400).json({ 
+      success: false, 
+      message: error.message || 'Failed to send reset email' 
+    });
+  }
 
   res.status(200).json({ success: true, message: 'Password reset email sent' });
 };
